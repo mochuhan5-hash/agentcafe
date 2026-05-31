@@ -1,0 +1,42 @@
+[project]
+name = "agentcafe1"
+version = "0.1.0"
+description = "LangGraph world-cafe multi-agent orchestration"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115.0",
+    "httpx>=0.28.0",
+    "langchain>=1.0.0",
+    "langchain-openai>=1.0.0",
+    "langgraph>=1.1.0",
+    "pydantic>=2.7.0",
+    "python-dotenv>=1.0.1",
+    "pyyaml>=6.0.1",
+    "rich>=13.7.0",
+    "uvicorn>=0.32.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.24.0",
+]
+
+[project.scripts]
+world-cafe = "world_cafe.cli:main"
+world-cafe-web = "world_cafe.web:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build]
+include = ["src/world_cafe/**"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/world_cafe"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

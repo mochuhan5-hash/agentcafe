@@ -1,0 +1,13 @@
+.venv/
+.env
+.env.*
+!.env.example
+.claude/settings.local.json
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+*.log
+
+runs/
