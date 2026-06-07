@@ -20,6 +20,7 @@ from world_cafe.prompts import (
     host_closing_prompt,
     host_opening_prompt,
     host_synthesis_prompt,
+    parent_question_from_spec,
 )
 from world_cafe.rotation import build_initial_assignments, rotate_non_hosts
 from world_cafe.state import (
@@ -243,12 +244,9 @@ def _make_table_discussion_node(llm: CafeLLM, pause_check: PauseCheck, note_chec
 
         await pause_check(task["run_id"])
         opening_system, opening_user = host_opening_prompt(
-            table_id=table_id,
             question=task["question"],
-            round_index=round_index,
-            host=host,
+            parent_question=parent_question_from_spec(task["question"], table_spec),
             memory=memory,
-            table_spec=table_spec,
             background_context=background_context,
         )
         raw_host_opening = await llm.agenerate(opening_system, opening_user)

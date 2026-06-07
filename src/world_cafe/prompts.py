@@ -178,7 +178,7 @@ def contribution_prompt(
         f"桌长记忆：\n{format_memory(memory)}\n\n"
         f"你的 carry_over_packet（agent-level migrant memory）：\n{format_packet(carry_over_packet)}\n\n"
         f"本轮到目前为止的对话：\n{transcript}\n\n"
-        "现在轮到你发言。请像真实小桌参与者一样结合table_spec、background_context、table_memory 和 carry_over_packet 自然回应，不要按字段、来源或小标题输出。"
+        "现在轮到你发言。请像真实小桌参与者一样结合table_spec、background_context、table_memory 和 carry_over_packet(包含你从上一轮讨论产生的个人洞察) 自然回应，不要按字段、来源或小标题输出。"
         "如果前面已经有人发言，先回应最近一位发言者的意思，再把你的观察自然接进去；"
         "如果当前讨论已经重复上一轮的稳定 pattern，请不要再阐述同一观点，而是带入一个不同用户/场景/机制盲点/反例/追问。"
         "如果你使用了 carry_over_packet 或 table_memory，只让它影响你的判断，不要说明你正在使用它。"
@@ -189,43 +189,30 @@ def contribution_prompt(
 
 def host_opening_prompt(
     *,
-    table_id: str,
     question: str,
-    round_index: int,
-    host: AgentProfile,
+    parent_question: str,
     memory: TableMemory,
-    table_spec: TableSpec | dict[str, Any],
     background_context: str = "",
 ) -> tuple[str, str]:
     system = (
-        "你是 World Cafe table host agent。你不是普通发言者，也不是 summarizer。"
-        "你的角色是中立记忆维护者、过程促进者、局部模式识别者。"
-        "每轮开始前，你需要同时对齐本桌 question、table_spec、source_context 和 table_memory。"
-        "用户原始大问题和 source_context 是上位任务边界；本桌 question/table_spec 提供当前讨论切入点、lens 和证据锚点；table_memory、round history digest 和累计模式演化提供多轮追问线索。"
-        "opening 只负责提出开放问题；问题要考虑跨轮持续出现的 pattern、正在变化的弱信号、与前几轮的差异、空白、模糊点和仍未解决的张力。"
-        "不要重新阐述上一轮已经稳定的共识；优先从上一轮尚不完善的 pattern、冲突、少数信号、证据缺口和未完成问题中打开下一轮。"
-        "table_memory 是你的内在记忆，不是要向参与者展示的表格；不要复述记忆摘要，不要包装成共识。"
+        "你是 World Cafe table host agent。"
+        "你的任务是在每轮开始前提出中立、简短、开放的引导性子问题。"
         "如果 opening 中出现设计机会、机会假设或类似表达，请把相关词组或句子加粗。"
     )
-    focus = _round_focus(round_index)
     user = (
-        f"桌子：{table_id}\n"
-        f"轮次：{round_index + 1}\n"
-        f"本轮侧重点：{focus}\n"
-        f"用户原始大问题：{parent_question_from_spec(question, table_spec)}\n"
+        f"用户原始大问题：{parent_question}\n"
         f"本桌问题：{question}\n\n"
-        f"table_spec：\n{format_table_spec(table_spec)}\n\n"
-        f"桌长画像：\n{format_agent(host)}\n\n"
         f"既有 table_memory（含所有已完成轮次摘要）：\n{format_memory(memory)}\n\n"
-        f"source_context：\n{format_background(background_context)}\n\n"
+        f"background_context：\n{format_background(background_context)}\n\n"
         "请输出简短 Markdown，系统会只把 opening 展示给用户，question_seeds 只用于流程引导：\n"
         "## opening\n"
-        "300字以内，只提出2-3个可直接开启讨论的简短开放问句。不要总结上一轮，不暴露 table_memory 字段，不添加太多背景、解释或引导信息；问题之间要形成推进，而不是重新开题。\n\n"
+        "提出2-3个可直接开启讨论的简短开放问句，每个问题尽量一句话。\n\n"
         "## question_seeds\n"
-        "- 2-3 个本轮子问题，每个问题尽量一句话。\n"
+        "查看本桌所有已完成轮次的 table_memory（如有），在本桌问题背景下，按照不同的 round 提出以下不同维度的引导性子问题：\n"
         "- Round 1 发散观察：基于 table_spec、source_context 和本桌 lens，引导参与者打开观察面。\n"
-        "- Round 2 连接与张力：仍以 table_spec、source_context 和本桌 lens 为锚，结合 Round 1 的 table_memory，避开已稳定共识，追问证据不足的 pattern、挑战主流判断的少数观点、利益相关者/机制张力。\n"
-        "- Round 3 问题重构：仍以 table_spec、source_context 和本桌 lens 为锚，结合前两轮 pattern delta，追问原始问题是否要改写、哪个未解决张力可能变成设计机会、哪个假设最值得验证。"
+        "- Round 2 连接与张力：仍以 table_spec、source_context 和本桌 lens 为锚，结合 Round 1 的 table_memory，避开已稳定共识（已重复出现的主题），追问新的转变、挑战少数观点、利益相关者/机制张力等。\n"
+        "- Round 3 问题重构：仍以 table_spec、source_context 和本桌 lens 为锚，结合前两轮 table_memory，追问原始问题是否要改写、哪个未解决张力可能变成设计机会、哪个假设最值得验证。\n"
+        "注意：最后只提出2-3个可直接开启讨论的简短开放问句，每个问题尽量一句话。不添加太多背景、解释或引导信息；每轮的子问题之间要形成推进。"
     )
     return system, user
 
@@ -307,27 +294,21 @@ def host_closing_prompt(
 ) -> tuple[str, str]:
     system = (
         "你是 World Cafe table host agent。现在你要输出本轮可见结束语，而不是内在记忆 JSON。"
-        "结束语的任务不是完整总结，而是让参与者看见本轮产生的差异：哪些 pattern 暂时成形，哪些还不完善，哪里有冲突/违背直觉/未解决张力，下一轮应带走什么追问。"
+        "结束语的任务不是完整总结，而是让参与者看见本轮的pattern：重复出现的主题（共识）、讨论的转变、少数但有启发的观点、未解决张力。"
         "只输出自然语言 Markdown，不要暴露字段名、JSON、模板名或内部记忆说明。"
         "用关键词式短句，300字以内，最多4行；不要写成长段落，不要复述每个人发言。"
-        "如果出现设计机会、机会假设或类似表达，请把相关词组或句子加粗。"
     )
     user = (
-        f"桌子：{table_id}\n"
-        f"轮次：{round_index + 1}\n"
         f"用户原始大问题：{parent_question_from_spec(question, table_spec or {})}\n"
         f"本桌问题：{question}\n\n"
-        f"table_spec：\n{format_table_spec(table_spec or {})}\n\n"
-        f"桌长画像：\n{format_agent(host)}\n\n"
         f"既有 table_memory：\n{format_memory(memory)}\n\n"
         f"用户标记笔记（优先参考）：\n{format_user_notes(user_notes)}\n\n"
-        f"本轮内在记忆合成后的可见上下文：\n{format_closing_context(memory_update)}\n\n"
         f"本轮发言摘录：\n{chr(10).join(contributions[:12])}\n\n"
         "请输出 300 字以内的本轮结束语。建议形式：\n"
-        "- 成形：关键词/短句\n"
-        "- 模糊：关键词/短句\n"
-        "- 冲突：关键词/短句\n"
-        "- 带走：1-2个下一轮追问\n"
+        "- 共识：关键词/短句\n"
+        "- 转变：关键词/短句\n"
+        "- 隐藏观点：（对应少数但有启发的观点）关键词/短句\n"
+        "- 张力：关键词/短句\n"
         "可以调整措辞，但重点必须是差异、缺口、冲突和未完成问题，不要做完整摘要。"
     )
     return system, user
@@ -394,15 +375,6 @@ def global_harvest_prompt(table_memories: dict[str, TableMemory], round_summarie
         "如果无法输出 JSON，则直接输出同样结构的自然 Markdown。"
     )
     return system, user
-
-
-def _round_focus(round_index: int) -> str:
-    if round_index <= 0:
-        return "发散观察"
-    if round_index == 1:
-        return "连接与张力"
-    return "问题重构"
-
 
 def _compact_json(value: Any) -> str:
     if value in ("", None, [], {}):

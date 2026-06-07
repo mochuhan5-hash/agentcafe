@@ -18,7 +18,7 @@ from pydantic import BaseModel, Field
 
 from world_cafe.facilitator import facilitate_request
 from world_cafe.graph import build_world_cafe_graph, create_initial_state
-from world_cafe.llm import OpenAICafeLLM
+from world_cafe.llm import OpenAICafeLLM, base_url_from_env, configured_auth_token_count, model_from_env
 from world_cafe.profiles import build_default_agent_profiles, load_agent_profiles
 from world_cafe.report import state_to_jsonable, write_outputs
 from world_cafe.state import AgentProfile, UserNote, WorldCafeState
@@ -204,10 +204,12 @@ async def index() -> FileResponse:
 
 @app.get("/api/config")
 async def config() -> dict[str, Any]:
+    token_count = configured_auth_token_count()
     return {
-        "token_configured": bool(os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN")),
-        "base_url": os.getenv("OPENAI_BASE_URL") or os.getenv("ANTHROPIC_BASE_URL", "http://143.198.222.179:8317/v1"),
-        "model": os.getenv("OPENAI_MODEL") or os.getenv("ANTHROPIC_MODEL", "gpt-5.5"),
+        "token_configured": token_count > 0,
+        "token_count": token_count,
+        "base_url": base_url_from_env(),
+        "model": model_from_env(),
         "default_rounds": int(os.getenv("WORLD_CAFE_ROUNDS", "3")),
         "default_table_count": int(os.getenv("WORLD_CAFE_TABLES", "4")),
         "default_speakers_per_table": int(os.getenv("WORLD_CAFE_SPEAKERS_PER_TABLE", "3")),

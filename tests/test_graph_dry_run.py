@@ -333,12 +333,10 @@ def test_prompts_limit_agent_turns_and_global_harvest_length() -> None:
         cycle_index=0,
     )
     _, host_opening_user = host_opening_prompt(
-        table_id="table_01",
         question="q1",
-        round_index=0,
-        host=agent,
+        parent_question="用户大问题",
         memory=memory,
-        table_spec={"parent_question": "用户大问题"},
+        background_context="背景上下文",
     )
     _, harvest_user = global_harvest_prompt({"table_01": memory}, [])
 
@@ -350,6 +348,9 @@ def test_prompts_limit_agent_turns_and_global_harvest_length() -> None:
     assert "reframing" in contribution_user
     assert "用户原始大问题：用户大问题" in host_opening_user
     assert "只提出2-3个可直接开启讨论的简短开放问句" in host_opening_user
+    assert "background_context" in host_opening_user
+    assert "桌长画像" not in host_opening_user
+    assert "table_spec：" not in host_opening_user
     assert "500字以内" in harvest_user
 
 
@@ -524,7 +525,7 @@ async def test_visible_outputs_are_natural_and_bold_design_opportunities() -> No
 async def test_host_record_display_never_exposes_json_memory() -> None:
     class BrokenJsonHostLLM(DryRunCafeLLM):
         async def agenerate(self, system: str, user: str) -> str:
-            if "host_memory_update_instruction" in user:
+            if "请输出 300 字以内的本轮结束语" in user:
                 return """
 {
   "synthesis": "这段 JSON 少了结尾，所以不能原样暴露",
@@ -548,7 +549,8 @@ async def test_host_record_display_never_exposes_json_memory() -> None:
     assert "{" not in display
     assert "host_memory_update_instruction" not in display
     assert "llm_generated_table_memory_template" not in display
-    assert "桌长已更新本桌记忆" in display
+    assert "这段 JSON 少了结尾" not in display
+    assert "## 洞察关键词" in display
 
 
 @pytest.mark.asyncio

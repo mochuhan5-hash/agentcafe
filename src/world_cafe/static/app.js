@@ -147,7 +147,8 @@ document.addEventListener("selectionchange", () => {
 async function init() {
   try {
     const config = await getJson("/api/config");
-    modelBadge.textContent = `${config.model} · ${config.base_url}`;
+    const tokenLabel = config.token_count ? ` · ${config.token_count} tokens` : "";
+    modelBadge.textContent = `${config.model} · ${config.base_url}${tokenLabel}`;
     tableCountInput.value = config.default_table_count || 4;
     speakersInput.value = config.default_speakers_per_table || 3;
     roundsInput.value = config.default_rounds || 3;
@@ -510,12 +511,10 @@ function renderQuestionEditor(tables) {
   questionEditor.innerHTML = "";
   buildDefaultAssignments(tables);
   tables.forEach((table) => {
-    const parentQuestion = table.parent_question || requestInput.value.trim();
     const field = document.createElement("div");
     field.className = "question-field";
     field.innerHTML = `
       <label for="${table.table_id}">${table.table_id}</label>
-      <strong class="parent-question">${escapeHtml(parentQuestion)}</strong>
       <textarea id="${table.table_id}" data-table-id="${table.table_id}">${escapeHtml(table.question)}</textarea>
     `;
     questionEditor.append(field);
@@ -583,11 +582,9 @@ function renderTables(run) {
     const hostId = run.hosts[tableId];
     const hostName = profiles[hostId]?.name || hostId;
     const tableSpec = run.table_specs?.[tableId] || {};
-    const parentQuestion = tableSpec.parent_question || "";
     const table = document.createElement("section");
     table.className = "table-card";
     table.dataset.tableId = tableId;
-    table.dataset.parentQuestion = parentQuestion;
     table.dataset.tableQuestion = question;
     table.innerHTML = `
       <header>
@@ -596,7 +593,6 @@ function renderTables(run) {
           <span class="host-tag">桌长 ${escapeHtml(hostName)}</span>
         </div>
         <div class="table-question">
-          ${parentQuestion ? `<strong>${escapeHtml(parentQuestion)}</strong>` : ""}
           <span>${escapeHtml(question)}</span>
         </div>
       </header>
@@ -615,7 +611,6 @@ function ensureRound(tableId, roundIndex, agentIds = []) {
   if (round) return round;
 
   const displayRound = Number(roundIndex) + 1;
-  const parentQuestion = table.dataset.parentQuestion || "";
   const tableQuestion = table.dataset.tableQuestion || "";
   round = document.createElement("div");
   round.className = "round-block";
@@ -623,7 +618,6 @@ function ensureRound(tableId, roundIndex, agentIds = []) {
   round.innerHTML = `
     <div class="round-heading">
       <div class="round-question">
-        ${parentQuestion ? `<strong>${escapeHtml(parentQuestion)}</strong>` : ""}
         <span>${escapeHtml(tableQuestion)}</span>
       </div>
       <div class="round-meta">
@@ -1317,8 +1311,7 @@ function addMessage(kind, content) {
 function formatQuestions(tables) {
   return tables
     .map((table) => {
-      const parent = table.parent_question || requestInput.value.trim();
-      return `${parent ? `**${parent}**\n` : ""}${table.table_id}: ${table.question}`;
+      return `${table.table_id}: ${table.question}`;
     })
     .join("\n\n");
 }

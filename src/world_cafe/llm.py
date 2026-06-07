@@ -10,6 +10,71 @@ from typing import Protocol
 import httpx
 
 
+DEFAULT_OPENAI_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+DEFAULT_OPENAI_MODEL = "qwen-plus"
+
+
+def auth_tokens_from_env() -> list[str]:
+    return _split_auth_tokens(
+        os.getenv("OPENAI_API_KEYS"),
+        os.getenv("DASHSCOPE_API_KEYS"),
+        os.getenv("ANTHROPIC_AUTH_TOKENS"),
+        os.getenv("OPENAI_API_KEY"),
+        os.getenv("DASHSCOPE_API_KEY"),
+        os.getenv("ANTHROPIC_AUTH_TOKEN"),
+    )
+
+
+def configured_auth_token_count() -> int:
+    return len(auth_tokens_from_env())
+
+
+def base_url_from_env() -> str:
+    return (
+        os.getenv("OPENAI_BASE_URL")
+        or os.getenv("DASHSCOPE_BASE_URL")
+        or os.getenv("ANTHROPIC_BASE_URL")
+        or DEFAULT_OPENAI_BASE_URL
+    )
+
+
+def model_from_env() -> str:
+    return (
+        os.getenv("OPENAI_MODEL")
+        or os.getenv("DASHSCOPE_MODEL")
+        or os.getenv("ANTHROPIC_MODEL")
+        or DEFAULT_OPENAI_MODEL
+    )
+
+
+def _split_auth_tokens(*values: str | None) -> list[str]:
+    tokens: list[str] = []
+    for value in values:
+        if not value:
+            continue
+        raw_value = value.strip()
+        if not raw_value:
+            continue
+        candidates: list[str]
+        if raw_value.startswith("["):
+            try:
+                loaded = json.loads(raw_value)
+            except json.JSONDecodeError:
+                loaded = None
+            if isinstance(loaded, list):
+                candidates = [str(item) for item in loaded]
+            else:
+                candidates = [raw_value]
+        else:
+            normalized = raw_value.replace(";", ",").replace("\n", ",")
+            candidates = normalized.split(",")
+        for candidate in candidates:
+            token = candidate.strip().strip('"').strip("'")
+            if token and token not in tokens:
+                tokens.append(token)
+    return tokens
+
+
 class CafeLLM(Protocol):
     async def agenerate(self, system: str, user: str) -> str:
         """Generate text for a world-cafe step."""
@@ -119,7 +184,8 @@ class OpenAICafeLLM:
     def __init__(
         self,
         *,
-        auth_token: str,
+        auth_token: str = "",
+        auth_tokens: list[str] | tuple[str, ...] | None = None,
         base_url: str,
         model: str,
         temperature: float = 0.7,
@@ -128,9 +194,11 @@ class OpenAICafeLLM:
         concurrency: int = 3,
         retries: int = 1,
     ) -> None:
-        if not auth_token:
-            raise ValueError("OPENAI_API_KEY is required")
-        self.auth_token = auth_token
+        tokens = _split_auth_tokens(auth_token, *(auth_tokens or []))
+        if not tokens:
+            raise ValueError("OPENAI_API_KEY or OPENAI_API_KEYS is required")
+        self.auth_tokens = tokens
+        self.auth_token = tokens[0]
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.temperature = temperature
@@ -138,6 +206,8 @@ class OpenAICafeLLM:
         self.timeout = timeout
         self.retries = retries
         self._semaphore = asyncio.Semaphore(max(1, concurrency))
+        self._auth_token_index = 0
+        self._auth_token_lock = asyncio.Lock()
 
     @classmethod
     def from_env(
@@ -148,9 +218,9 @@ class OpenAICafeLLM:
         timeout: float | None = None,
     ) -> "OpenAICafeLLM":
         return cls(
-            auth_token=os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN", ""),
-            base_url=os.getenv("OPENAI_BASE_URL") or os.getenv("ANTHROPIC_BASE_URL", "http://143.198.222.179:8317/v1"),
-            model=os.getenv("OPENAI_MODEL") or os.getenv("ANTHROPIC_MODEL", "gpt-5.5"),
+            auth_tokens=auth_tokens_from_env(),
+            base_url=base_url_from_env(),
+            model=model_from_env(),
             temperature=temperature,
             max_tokens=max_tokens,
             timeout=timeout if timeout is not None else float(os.getenv("WORLD_CAFE_LLM_TIMEOUT", "180")),
@@ -168,14 +238,23 @@ class OpenAICafeLLM:
                 {"role": "user", "content": user},
             ],
         }
-        headers = {
-            "content-type": "application/json",
-            "authorization": f"Bearer {self.auth_token}",
-        }
         async with self._semaphore:
+            auth_token = await self._next_auth_token()
+            headers = {
+                "content-type": "application/json",
+                "authorization": f"Bearer {auth_token}",
+            }
             response = await self._post_with_retries(payload, headers)
         data = response.json()
         return _extract_text(data)
+
+    async def _next_auth_token(self) -> str:
+        if len(self.auth_tokens) == 1:
+            return self.auth_tokens[0]
+        async with self._auth_token_lock:
+            token = self.auth_tokens[self._auth_token_index % len(self.auth_tokens)]
+            self._auth_token_index += 1
+            return token
 
     async def _post_with_retries(self, payload: dict, headers: dict[str, str]) -> httpx.Response:
         last_error: Exception | None = None
