@@ -1,6 +1,11 @@
 import pytest
 
-from world_cafe.graph import build_world_cafe_graph, create_initial_state
+from world_cafe.graph import (
+    _harvest_display_content,
+    _parse_structured_harvest,
+    build_world_cafe_graph,
+    create_initial_state,
+)
 from world_cafe.llm import DryRunCafeLLM
 from world_cafe.prompts import contribution_prompt, global_harvest_prompt, host_opening_prompt
 
@@ -54,7 +59,7 @@ async def test_note_checkpoint_notes_are_passed_to_host_synthesis() -> None:
 
     class NoteAwareLLM(DryRunCafeLLM):
         async def agenerate(self, system: str, user: str) -> str:
-            if "User-marked notes for this table/round" in user and "host_memory_update_instruction" in user:
+            if "User-marked notes for this table/round" in user and '"formatmemory"' in user:
                 captured_host_prompts.append(user)
             return await super().agenerate(system, user)
 
@@ -220,8 +225,8 @@ async def test_packet_generation_failure_still_routes_speaking_agents() -> None:
     assert final_state["agent_pockets"]
     packet = next(iter(final_state["agent_pockets"].values()))
     assert packet["generation_error"] == "packet gateway failed"
-    assert packet["llm_generated_memory_template"]["template_name"] == "fallback_speaking_agent_migrant_memory"
-    assert "personal_takeaway" in packet["agent_generated_memory"]
+    assert packet["agent"]["id"]
+    assert "personal_insight" in packet["agent_generated_memory"]
 
 
 @pytest.mark.asyncio
@@ -440,8 +445,10 @@ async def test_context_orchestration_generates_host_memory_and_pockets() -> None
     assert "current_table_task_anchor" not in packet
     assert final_state["rotation_history"][0]["packet_routes"]
     memory = final_state["table_memories"]["table_01"]
-    assert "llm_generated_table_memory_template" in memory
-    assert "host_generated_table_memory" in memory
+    assert "formatmemory" in memory
+    assert memory["formatmemory"]
+    assert "llm_generated_table_memory_template" not in memory
+    assert "host_generated_table_memory" not in memory
 
 
 @pytest.mark.asyncio
@@ -455,28 +462,28 @@ async def test_visible_outputs_are_natural_and_bold_design_opportunities() -> No
                     "## question_seeds\n"
                     "- 哪个边缘情境最能改变问题理解？"
                 )
-            if "host_memory_update_instruction" in user:
+            if '"formatmemory"' in user:
                 return """
 {
-  "synthesis": "本轮保留一个设计机会：把少数观点作为下一轮问题重构入口。",
-  "key_insights": ["设计机会来自边缘场景与主流旅程之间的落差。"],
-  "open_questions": ["这个机会假设需要哪些证据？"],
-  "tensions": ["效率优先与包容性探索之间存在张力。"],
-  "source_context_anchor": ["用户访谈中的边缘案例"],
-  "host_memory_update_instruction": "内部记忆更新说明，不应进入可见桌长记录。",
-  "llm_generated_table_memory_template": {"template_name": "internal_template", "fields": {"minority_signal": "what changed"}},
-  "host_generated_table_memory": {"minority_signal": "边缘案例改变了问题边界"},
-  "round_pattern_delta": "从一般痛点转向边缘案例里的设计机会。",
+  "formatmemory": {
+    "table_question": "q1",
+    "round_index": 1,
+    "repeated_themes": ["设计机会来自边缘场景与主流旅程之间的落差。"],
+    "minority_inspiring_views": ["边缘案例改变了问题边界。"],
+    "unresolved_tensions": ["效率优先与包容性探索之间存在张力。"]
+  },
   "next_round_question_seeds": ["如何验证这个机会假设？"]
 }
 """
-            if "memory_update_instruction" in user and "bridge_intent" in user:
+            if '"agent_generated_memory"' in user:
                 return """
 {
-  "memory_update_instruction": "内部迁移记忆，不应被发言机械复述。",
-  "llm_generated_memory_template": {"template_name": "agent_memory", "fields": {"bridge": "next table connection"}},
-  "agent_generated_memory": {"bridge": "边缘案例可能解释当前桌张力"},
-  "bridge_intent": "到下一桌测试边缘案例与系统张力的关系。"
+  "agent": {"id": "agent_02", "name": "Agent Two", "role": "participant", "skills": ["edge cases"]},
+  "agent_generated_memory": {
+    "skill_lens": "edge cases",
+    "personal_insight": "边缘案例可能解释当前桌张力",
+    "carry_forward_question": "下一桌是否也存在类似边缘张力？"
+  }
 }
 """
             if "display_markdown" in user:
@@ -510,7 +517,7 @@ async def test_visible_outputs_are_natural_and_bold_design_opportunities() -> No
     assert "**" in output["contributions"][0]["content"]
     assert "**" in output["host_record_display"]
     assert "host_memory_update_instruction" not in output["host_record_display"]
-    assert "internal_template" not in output["host_record_display"]
+    assert "formatmemory" not in output["host_record_display"]
     host_record_events = [
         event for event in final_state["trace"]
         if event["stage"] == "host_record"
@@ -518,6 +525,7 @@ async def test_visible_outputs_are_natural_and_bold_design_opportunities() -> No
     assert host_record_events
     assert "raw_content" not in host_record_events[0]["metadata"]
     assert "host_memory_update_instruction" not in host_record_events[0]["metadata"]["content"]
+    assert "formatmemory" not in host_record_events[0]["metadata"]["content"]
     assert "**" in final_state["harvest"]["content"]
 
 
@@ -525,12 +533,11 @@ async def test_visible_outputs_are_natural_and_bold_design_opportunities() -> No
 async def test_host_record_display_never_exposes_json_memory() -> None:
     class BrokenJsonHostLLM(DryRunCafeLLM):
         async def agenerate(self, system: str, user: str) -> str:
-            if "请输出 300 字以内的本轮结束语" in user:
+            if '"formatmemory"' in user:
                 return """
 {
-  "synthesis": "这段 JSON 少了结尾，所以不能原样暴露",
-  "host_memory_update_instruction": "internal only",
-  "llm_generated_table_memory_template": {"template_name": "private"}
+  "formatmemory": {
+    "repeated_themes": ["这段 JSON 少了结尾，所以不能原样暴露"]
 """
             return await super().agenerate(system, user)
 
@@ -547,10 +554,9 @@ async def test_host_record_display_never_exposes_json_memory() -> None:
 
     display = final_state["table_round_outputs"][0]["host_record_display"]
     assert "{" not in display
-    assert "host_memory_update_instruction" not in display
-    assert "llm_generated_table_memory_template" not in display
-    assert "这段 JSON 少了结尾" not in display
-    assert "## 洞察关键词" in display
+    assert "formatmemory" not in display
+    assert "repeated_themes" not in display
+    assert display.strip()
 
 
 @pytest.mark.asyncio
@@ -586,3 +592,10 @@ async def test_json_harvest_is_stored_as_structured_harvest() -> None:
     assert harvest["content"].startswith("## Shared Patterns")
     assert harvest["structured_harvest"]["pattern_channel"][0]["pattern"] == "shared pattern"
     assert harvest["structured_harvest"]["weak_signal_channel"][0]["signal"] == "rare signal"
+
+
+def test_json_harvest_with_unknown_fields_falls_back_to_raw_content() -> None:
+    content = '{"summary": "模型返回了非约定字段，但仍有可读 harvest 内容。"}'
+    structured = _parse_structured_harvest(content)
+
+    assert _harvest_display_content(content, structured) == content

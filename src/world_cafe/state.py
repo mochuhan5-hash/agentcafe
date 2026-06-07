@@ -59,13 +59,11 @@ class TableSpec(TypedDict, total=False):
 
 class CarryOverPacket(TypedDict, total=False):
     agent_id: str
+    agent: dict[str, Any]
     from_table: str
     to_table: str
     after_round: int
-    memory_update_instruction: str
-    llm_generated_memory_template: dict[str, Any]
     agent_generated_memory: dict[str, Any] | str
-    bridge_intent: str
 
 
 class TableMemory(TypedDict, total=False):
@@ -80,11 +78,9 @@ class TableMemory(TypedDict, total=False):
     incomplete_or_weak_patterns: list[str]
     contested_points: list[str]
     blind_spots_or_ambiguities: list[str]
+    formatmemory: list[dict[str, Any]]
     rounds: list[dict[str, Any]]
     source_context_anchor: list[str]
-    host_memory_update_instruction: str
-    llm_generated_table_memory_template: dict[str, Any]
-    host_generated_table_memory: dict[str, Any] | str
     cumulative_pattern_evolution: str
     recurring_patterns_across_rounds: list[str]
     emerging_or_fading_signals: list[str]
@@ -138,7 +134,6 @@ class WorldCafeState(TypedDict, total=False):
     assignments: dict[str, list[str]]
     hosts: dict[str, str]
     table_memories: dict[str, TableMemory]
-    table_memory_templates: dict[str, Any]
     agent_pockets: dict[str, CarryOverPacket]
     pocket_history: Annotated[list[dict[str, Any]], operator.add]
     host_openings: Annotated[list[dict[str, Any]], operator.add]

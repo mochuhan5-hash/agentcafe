@@ -1,8 +1,17 @@
 from __future__ import annotations
 
-import json
 from typing import Any
 
+from world_cafe.context import (
+    MemoryView,
+    format_background,
+    format_carry_over_packet,
+    format_closing_context,
+    format_table_memory,
+    format_table_spec,
+    format_user_notes,
+    parent_question_from_spec,
+)
 from world_cafe.state import AgentProfile, CarryOverPacket, TableMemory, TableSpec, UserNote
 
 
@@ -16,124 +25,12 @@ def format_agent(profile: AgentProfile) -> str:
     )
 
 
-def format_memory(memory: TableMemory) -> str:
-    insights = "\n".join(f"- {item}" for item in memory.get("key_insights", [])) or "- 暂无"
-    questions = "\n".join(f"- {item}" for item in memory.get("open_questions", [])) or "- 暂无"
-    tensions = "\n".join(f"- {item}" for item in memory.get("tensions", [])) or "- 暂无"
-    stable_patterns = _format_items(memory.get("stable_patterns"))
-    weak_patterns = _format_items(memory.get("incomplete_or_weak_patterns"))
-    contested_points = _format_items(memory.get("contested_points"))
-    blind_spots = _format_items(memory.get("blind_spots_or_ambiguities"))
-    dynamic_memory = memory.get("host_generated_table_memory") or ""
-    cumulative_evolution = memory.get("cumulative_pattern_evolution") or "暂无"
-    recurring_patterns = _format_items(memory.get("recurring_patterns_across_rounds"))
-    emerging_signals = _format_items(memory.get("emerging_or_fading_signals"))
-    unresolved_over_time = _format_items(memory.get("unresolved_tensions_over_time"))
-    pattern_delta = memory.get("round_pattern_delta") or "暂无"
-    question_seeds = "\n".join(f"- {item}" for item in memory.get("next_round_question_seeds", [])) or "- 暂无"
-    round_history = _format_round_history(memory)
-    return (
-        f"桌子问题：{memory['question']}\n"
-        f"活记忆摘要：{memory.get('living_summary') or '暂无'}\n"
-        f"关键洞察：\n{insights}\n"
-        f"开放问题：\n{questions}\n"
-        f"张力：\n{tensions}\n"
-        f"已成形模式：\n{stable_patterns}\n"
-        f"仍不完善或证据不足的模式：\n{weak_patterns}\n"
-        f"冲突或违背直觉的观点：\n{contested_points}\n"
-        f"空白、盲点或模糊处：\n{blind_spots}\n"
-        f"动态桌长记忆：{_compact_json(dynamic_memory)}\n"
-        f"累计模式演化：{cumulative_evolution}\n"
-        f"跨轮重复模式：\n{recurring_patterns}\n"
-        f"新出现或正在减弱的信号：\n{emerging_signals}\n"
-        f"持续未解张力：\n{unresolved_over_time}\n"
-        f"最新 round pattern delta：{pattern_delta}\n"
-        f"已完成轮次历史：\n{round_history}\n"
-        f"下一轮问题种子：\n{question_seeds}"
-    )
-
-
-def format_table_spec(table_spec: TableSpec | dict[str, Any]) -> str:
-    if not table_spec:
-        return "暂无。"
-    return _compact_json(table_spec)
-
-
-def parent_question_from_spec(question: str, table_spec: TableSpec | dict[str, Any] | None) -> str:
-    if isinstance(table_spec, dict):
-        parent = str(
-            table_spec.get("parent_question")
-            or table_spec.get("main_question")
-            or table_spec.get("user_question")
-            or ""
-        ).strip()
-        if parent:
-            return parent
-    return question
+def format_memory(memory: TableMemory, *, view: MemoryView = "host_synthesis") -> str:
+    return format_table_memory(memory, view=view)
 
 
 def format_packet(packet: CarryOverPacket | dict[str, Any] | None) -> str:
-    if not packet:
-        return "暂无。"
-    return _compact_json(packet)
-
-
-def format_background(background_context: str) -> str:
-    context = background_context.strip()
-    if not context:
-        return "暂无。"
-    max_chars = 12000
-    if len(context) > max_chars:
-        context = f"{context[:max_chars]}\n\n[背景材料过长，已截断到前 {max_chars} 字符。]"
-    return context
-
-
-def format_user_notes(notes: list[UserNote] | list[dict[str, Any]] | None) -> str:
-    if not notes:
-        return "No user-marked notes submitted for this table/round."
-    lines: list[str] = []
-    for index, note in enumerate(notes[:24], start=1):
-        text = str(note.get("text") or "").strip()
-        if not text:
-            continue
-        if len(text) > 500:
-            text = f"{text[:500].rstrip()}..."
-        speaker = note.get("speaker_name") or note.get("speakerName") or note.get("speaker_id") or "unknown speaker"
-        speech_id = note.get("speech_id") or note.get("speechId") or ""
-        lines.append(f"{index}. [{speaker}; speech={speech_id}] {text}")
-    return "\n".join(lines) or "No usable user-marked notes submitted for this table/round."
-
-
-def format_closing_context(memory_update: dict[str, Any]) -> str:
-    lines: list[str] = []
-    field_labels = [
-        ("stable_patterns", "暂时成形的模式"),
-        ("incomplete_or_weak_patterns", "仍不完善或证据不足的模式"),
-        ("contested_points", "冲突或违背直觉的观点"),
-        ("tensions", "未解决张力"),
-        ("blind_spots_or_ambiguities", "空白、盲点或模糊处"),
-        ("open_questions", "下一轮追问"),
-        ("round_pattern_delta", "本轮相对累计历史的新变化"),
-        ("next_round_question_seeds", "可带走的问题种子"),
-    ]
-    for key, label in field_labels:
-        value = memory_update.get(key)
-        if value in ("", None, [], {}):
-            continue
-        if isinstance(value, list):
-            items = [str(item).strip() for item in value if str(item).strip()]
-            if items:
-                lines.append(f"{label}：")
-                lines.extend(f"- {item}" for item in items[:5])
-        elif isinstance(value, dict):
-            text = _compact_json(value)
-            if text and text != "暂无":
-                lines.append(f"{label}：{text}")
-        else:
-            text = str(value).strip()
-            if text:
-                lines.append(f"{label}：{text}")
-    return "\n".join(lines) or "本轮内在记忆没有提取到可见结束语线索。"
+    return format_carry_over_packet(packet)
 
 
 def contribution_prompt(
@@ -175,7 +72,7 @@ def contribution_prompt(
         f"背景材料：\n{format_background(background_context)}\n\n"
         f"你的画像：\n{format_agent(agent)}\n\n"
         f"本桌成员：\n{peers}\n\n"
-        f"桌长记忆：\n{format_memory(memory)}\n\n"
+        f"桌长记忆：\n{format_memory(memory, view='speaker')}\n\n"
         f"你的 carry_over_packet（agent-level migrant memory）：\n{format_packet(carry_over_packet)}\n\n"
         f"本轮到目前为止的对话：\n{transcript}\n\n"
         "现在轮到你发言。请像真实小桌参与者一样结合table_spec、background_context、table_memory 和 carry_over_packet(包含你从上一轮讨论产生的个人洞察) 自然回应，不要按字段、来源或小标题输出。"
@@ -202,16 +99,16 @@ def host_opening_prompt(
     user = (
         f"用户原始大问题：{parent_question}\n"
         f"本桌问题：{question}\n\n"
-        f"既有 table_memory（含所有已完成轮次摘要）：\n{format_memory(memory)}\n\n"
+        f"既有 table_memory（按开场问题裁剪）：\n{format_memory(memory, view='host_opening')}\n\n"
         f"background_context：\n{format_background(background_context)}\n\n"
         "请输出简短 Markdown，系统会只把 opening 展示给用户，question_seeds 只用于流程引导：\n"
         "## opening\n"
         "提出2-3个可直接开启讨论的简短开放问句，每个问题尽量一句话。\n\n"
         "## question_seeds\n"
         "查看本桌所有已完成轮次的 table_memory（如有），在本桌问题背景下，按照不同的 round 提出以下不同维度的引导性子问题：\n"
-        "- Round 1 发散观察：基于 table_spec、source_context 和本桌 lens，引导参与者打开观察面。\n"
-        "- Round 2 连接与张力：仍以 table_spec、source_context 和本桌 lens 为锚，结合 Round 1 的 table_memory，避开已稳定共识（已重复出现的主题），追问新的转变、挑战少数观点、利益相关者/机制张力等。\n"
-        "- Round 3 问题重构：仍以 table_spec、source_context 和本桌 lens 为锚，结合前两轮 table_memory，追问原始问题是否要改写、哪个未解决张力可能变成设计机会、哪个假设最值得验证。\n"
+        "- Round 1 发散观察：基于本桌问题和背景材料，引导参与者打开观察面。\n"
+        "- Round 2 连接与张力：结合 Round 1 的 table_memory，避开已稳定共识，追问新的转变、挑战少数观点、利益相关者/机制张力等。\n"
+        "- Round 3 问题重构：结合前两轮 table_memory，追问原始问题是否要改写、哪个未解决张力可能变成设计机会、哪个假设最值得验证。\n"
         "注意：最后只提出2-3个可直接开启讨论的简短开放问句，每个问题尽量一句话。不添加太多背景、解释或引导信息；每轮的子问题之间要形成推进。"
     )
     return system, user
@@ -230,17 +127,14 @@ def host_synthesis_prompt(
     user_notes: list[UserNote] | list[dict[str, Any]] | None = None,
 ) -> tuple[str, str]:
     system = (
-        "你是 World Cafe table host agent。你的任务是维护 table-level intrinsic memory。"
-        "不要把讨论压缩成普通会议纪要；要动态保留已成形 pattern、仍不完善或证据不足的 pattern、少数但有启发的观点、内部冲突、未解决张力、累计模式演化、跨轮重复模式、变化信号、本轮相对累计历史的位置、低价值归档和下一轮 question seeds。"
-        "使用 LLM-generated template 策略：固定外壳可以稳定，但内部记忆维度应根据用户原始大问题、本桌问题、source_context、所有已完成轮次的 table_memory/round history digest 和本轮讨论动态决定。"
-        "你要观察 Round 1 到当前轮之间问题理解如何演化：哪些主题持续共振，哪些 pattern 仍不完善，哪些少数观点被放大或消失，哪些观点互相冲突，哪些张力反复未解决。"
-        "这是内部记忆更新，不是用户可见发言。请优先输出严格 JSON，不要输出面向用户的 Markdown。"
+        "你是这个 table host 的内部迁移记忆生成视角，正在记录每轮的 formatmemory。"
+        "formatmemory 每轮按顺序记录，只从本轮 speaking agents 的发言中提取：桌子问题下重复出现的主题、少数但有启发的观点、未解决张力。"
+        "这是内部记忆，不是可见发言；不要写会议纪要，不要生成完整方案，不要暴露给用户看的 Markdown。"
+        "请输出可供系统路由和被上下文引用的严格 JSON。"
     )
     system += (
-        "\n\nMemory priority for this synthesis: user_marked_notes are the highest-priority evidence; "
-        "existing table_memory and all prior round history are second; current conversation transcript is third; "
-        "table_spec and source_context remain task/evidence anchors throughout. "
-        "Use submitted notes to detect intentional design insights and design opportunities, but do not mechanically copy all notes into visible host remarks."
+        "\n\n若存在 user_marked_notes，可把它们作为高优先级证据帮助判断哪些少数观点或张力值得保留；"
+        "但 formatmemory 仍必须以本轮 speaking agents 的发言为输入，不要机械复制笔记。"
     )
     joined_contributions = "\n\n".join(contributions)
     formatted_user_notes = format_user_notes(user_notes)
@@ -249,32 +143,22 @@ def host_synthesis_prompt(
         f"轮次：{round_index + 1}\n"
         f"用户原始大问题：{parent_question_from_spec(question, table_spec or {})}\n"
         f"本桌初始问题：{question}\n\n"
-        f"table_spec：\n{format_table_spec(table_spec or {})}\n\n"
+        f"table_spec（只作问题边界参考）：\n{format_table_spec(table_spec or {})}\n\n"
         f"User-marked notes for this table/round (highest-priority evidence):\n{formatted_user_notes}\n\n"
         f"桌长画像：\n{format_agent(host)}\n\n"
-        f"既有桌长记忆（含所有已完成轮次摘要）：\n{format_memory(memory)}\n\n"
-        f"背景材料参考：\n{format_background(background_context)}\n\n"
-        f"本轮发言：\n{joined_contributions}\n\n"
+        f"既有 formatmemory（按轮顺序记录）：\n{format_memory(memory, view='host_synthesis')}\n\n"
+        f"背景材料（只作任务边界参考）：\n{format_background(background_context)}\n\n"
+        f"本轮 speaking agents 的全部发言：\n{joined_contributions}\n\n"
         "请输出 JSON：\n"
         "{\n"
-        '  "synthesis": "80-160字综合摘要，说明本轮如何进入或改变本桌累计讨论",\n'
-        '  "key_insights": ["..."],\n'
-        '  "stable_patterns": ["本轮比较成形、证据相对充分的 pattern"],\n'
-        '  "incomplete_or_weak_patterns": ["仍不完善、证据不足或表述模糊的 pattern"],\n'
-        '  "contested_points": ["互相冲突、互相拉扯或违背直觉的观点"],\n'
-        '  "open_questions": ["..."],\n'
-        '  "tensions": ["..."],\n'
-        '  "blind_spots_or_ambiguities": ["下一轮应补足的空白、盲点或模糊处"],\n'
-        '  "source_context_anchor": ["本轮讨论用到的原文证据线索"],\n'
-        '  "host_memory_update_instruction": "本轮应该如何更新桌长内在记忆",\n'
-        '  "llm_generated_table_memory_template": {"template_name": "...", "fields": {}},\n'
-        '  "host_generated_table_memory": {},\n'
-        '  "cumulative_pattern_evolution": "从 Round 1 到当前轮，本桌问题理解如何演化",\n'
-        '  "recurring_patterns_across_rounds": ["跨多个轮次重复出现或持续共振的模式"],\n'
-        '  "emerging_or_fading_signals": ["本轮新出现、被放大、减弱或消失的少数信号"],\n'
-        '  "unresolved_tensions_over_time": ["跨轮持续未解决或反复出现的张力"],\n'
-        '  "round_pattern_delta": "本轮相对累计历史的新变化（兼容字段，不只是上一轮差异）",\n'
-        '  "next_round_question_seeds": ["..."]\n'
+        '  "formatmemory": {\n'
+        '    "table_question": "本桌问题原文",\n'
+        f'    "round_index": {round_index + 1},\n'
+        '    "repeated_themes": ["桌子问题下重复出现的主题"],\n'
+        '    "minority_inspiring_views": ["少数但有启发的观点"],\n'
+        '    "unresolved_tensions": ["未解决张力"]\n'
+        '  },\n'
+        '  "next_round_question_seeds": ["可选，下一轮继续追问的1-3个问题"]\n'
         "}"
     )
     return system, user
@@ -299,10 +183,15 @@ def host_closing_prompt(
         "用关键词式短句，300字以内，最多4行；不要写成长段落，不要复述每个人发言。"
     )
     user = (
+        f"桌子：{table_id}\n"
+        f"轮次：{round_index + 1}\n"
         f"用户原始大问题：{parent_question_from_spec(question, table_spec or {})}\n"
         f"本桌问题：{question}\n\n"
-        f"既有 table_memory：\n{format_memory(memory)}\n\n"
+        f"table_spec：\n{format_table_spec(table_spec or {})}\n\n"
+        f"桌长画像：\n{format_agent(host)}\n\n"
+        f"既有 table_memory（按结束语裁剪）：\n{format_memory(memory, view='host_closing')}\n\n"
         f"用户标记笔记（优先参考）：\n{format_user_notes(user_notes)}\n\n"
+        f"本轮内在记忆合成后的可见上下文：\n{format_closing_context(memory_update)}\n\n"
         f"本轮发言摘录：\n{chr(10).join(contributions[:12])}\n\n"
         "请输出 300 字以内的本轮结束语。建议形式：\n"
         "- 共识：关键词/短句\n"
@@ -327,23 +216,27 @@ def carry_over_packet_prompt(
     system = (
         "你是这个 World Cafe speaking agent 的内部迁移记忆生成视角，正在为自己生成 carry_over_packet。"
         "你不是 table host，也不是 summarizer；packet 是你的 agent-level migrant memory，不是 table_memory 复制，也不是上一桌完整摘要。"
-        "采用 LLM-generated template：固定路由外壳，内部记忆模板根据 agent 角色、上一桌讨论和下一桌任务动态生成。"
-        "这是内部迁移记忆，不是可见发言。请输出可供系统路由和下轮上下文引用的 JSON。"
+        "采用 LLM-generated template：固定路由外壳，内部记忆模板根据 agent 角色和该 agent 在上一桌的发言动态生成。"
+        "这是内部迁移记忆，不是可见发言。请输出可供系统路由和下轮上下文引用的严格 JSON。"
     )
     user = (
         f"agent：\n{format_agent(agent)}\n\n"
         f"from_table：{from_table}\n"
         f"to_table：{to_table}\n"
         f"after_round：{after_round + 1}\n\n"
-        f"上一桌 table_memory（只作证据背景，不要复制成你的个人记忆）：\n{format_memory(from_memory)}\n\n"
-        f"该 agent 本轮发言：\n{chr(10).join(agent_contributions) or '暂无'}\n\n"
-        f"下一桌问题：{to_question}\n\n"
+        f"该 speaking agent 在本轮对话中的所有发言：\n{chr(10).join(agent_contributions) or '暂无'}\n\n"
+        f"下一桌问题（只帮助生成可迁移洞察，不要写成解决方案）：{to_question}\n\n"
         "请输出 JSON：\n"
         "{\n"
-        '  "memory_update_instruction": "...",\n'
-        '  "llm_generated_memory_template": {"template_name": "...", "fields": {}},\n'
-        '  "agent_generated_memory": {},\n'
-        '  "bridge_intent": "一句自然语言：如何把上一桌个人洞见带到下一桌任务中测试"\n'
+        '  "agent": {"id": "...", "name": "...", "role": "...", "skills": ["..."]},\n'
+        f'  "from_table": "{from_table}",\n'
+        f'  "to_table": "{to_table}",\n'
+        f'  "after_round": {after_round + 1},\n'
+        '  "agent_generated_memory": {\n'
+        '    "skill_lens": "这个 agent 使用了什么 skill 或角色视角",\n'
+        '    "personal_insight": "基于该 agent 本轮发言生成的个人洞察",\n'
+        '    "carry_forward_question": "下一桌可检验或连接的追问"\n'
+        '  }\n'
         "}"
     )
     return system, user
@@ -359,11 +252,12 @@ def global_harvest_prompt(table_memories: dict[str, TableMemory], round_summarie
     )
     memories = []
     for table_id, memory in sorted(table_memories.items()):
-        memories.append(f"## {table_id}\n{format_memory(memory)}")
+        memories.append(f"## {table_id}\n{format_memory(memory, view='harvest')}")
+    memories_text = "\n\n".join(memories)
     summaries = "\n".join(str(summary) for summary in round_summaries)
     user = (
         "以下是所有桌子的桌长记忆：\n\n"
-        f"{'\n\n'.join(memories)}\n\n"
+        f"{memories_text}\n\n"
         "轮次摘要：\n"
         f"{summaries}\n\n"
         "请优先输出 JSON，并包含 500字以内、可直接给用户看的 display_markdown。display_markdown 建议包含：\n"
@@ -376,70 +270,10 @@ def global_harvest_prompt(table_memories: dict[str, TableMemory], round_summarie
     )
     return system, user
 
-def _compact_json(value: Any) -> str:
-    if value in ("", None, [], {}):
-        return "暂无"
-    if isinstance(value, str):
-        return value
-    return json.dumps(value, ensure_ascii=False, indent=2)
 
-
-def _format_items(value: Any, limit: int = 8) -> str:
-    if value in ("", None, [], {}):
-        return "- 暂无"
-    if isinstance(value, dict):
-        items = [f"{key}: {item}" for key, item in value.items()]
-    elif isinstance(value, list):
-        items = [str(item) for item in value]
-    else:
-        items = [str(value)]
-    items = [item.strip() for item in items if item and item.strip()]
-    return "\n".join(f"- {item}" for item in items[:limit]) or "- 暂无"
-
-
-def _format_round_history(memory: TableMemory, limit: int = 6) -> str:
-    rounds = memory.get("rounds", [])
-    if not rounds:
-        return "- 暂无"
-    lines: list[str] = []
-    for item in rounds[-limit:]:
-        round_no = int(item.get("round_index", 0)) + 1
-        update = item.get("table_memory_update") or {}
-        synthesis = update.get("synthesis") or item.get("synthesis") or ""
-        evolution = update.get("cumulative_pattern_evolution") or ""
-        delta = update.get("round_pattern_delta") or ""
-        insights = _format_inline_list(item.get("key_insights"))
-        tensions = _format_inline_list(item.get("tensions"))
-        questions = _format_inline_list(item.get("open_questions"))
-        stable = _format_inline_list(update.get("stable_patterns"))
-        weak = _format_inline_list(update.get("incomplete_or_weak_patterns"))
-        contested = _format_inline_list(update.get("contested_points"))
-        blind = _format_inline_list(update.get("blind_spots_or_ambiguities"))
-        parts = [f"Round {round_no}: {str(synthesis).strip() or '暂无摘要'}"]
-        if evolution:
-            parts.append(f"累计演化: {evolution}")
-        if delta:
-            parts.append(f"本轮位置/变化: {delta}")
-        if insights:
-            parts.append(f"洞察: {insights}")
-        if tensions:
-            parts.append(f"张力: {tensions}")
-        if questions:
-            parts.append(f"开放问题: {questions}")
-        if stable:
-            parts.append(f"成形: {stable}")
-        if weak:
-            parts.append(f"不完善: {weak}")
-        if contested:
-            parts.append(f"冲突: {contested}")
-        if blind:
-            parts.append(f"盲点: {blind}")
-        lines.append("- " + " | ".join(parts))
-    return "\n".join(lines)
-
-
-def _format_inline_list(value: Any, limit: int = 3) -> str:
-    if not isinstance(value, list):
-        return ""
-    items = [str(item).strip() for item in value[:limit] if str(item).strip()]
-    return "；".join(items)
+def _round_focus(round_index: int) -> str:
+    if round_index <= 0:
+        return "发散观察"
+    if round_index == 1:
+        return "连接与张力"
+    return "问题重构"

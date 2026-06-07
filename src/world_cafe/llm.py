@@ -102,61 +102,34 @@ class DryRunCafeLLM:
                 "- 冲突：快速收束和保留分歧之间仍有拉扯。\n"
                 f"- 带走：下一轮追问哪个弱信号能打开**新的设计机会**？（trace {digest}）"
             )
-        if "host_memory_update_instruction" in user:
+        if '"formatmemory"' in user:
             return json.dumps(
                 {
-                    "synthesis": f"本轮桌面记忆显示，参与者正在把抽象判断转成可观察的情境差异。（trace {digest}）",
-                    "key_insights": [
-                        "把问题拆成参与者、场景、约束和可行动假设。",
-                        "让分歧显性化，比过早达成共识更有价值。",
-                    ],
-                    "stable_patterns": ["证据、场景和约束需要一起讨论。"],
-                    "incomplete_or_weak_patterns": ["边缘用户的差异仍缺少具体证据。"],
-                    "contested_points": ["先收束行动假设，还是继续保留分歧。"],
-                    "open_questions": [
-                        "哪些利益相关者还没有被纳入？",
-                        "哪个假设最值得优先验证？",
-                    ],
-                    "tensions": ["创造性发散与落地约束之间存在张力。"],
-                    "blind_spots_or_ambiguities": ["未纳入角色是否会改变问题边界。"],
-                    "source_context_anchor": ["用户上传材料中的任务背景与用户痛点。"],
-                    "host_memory_update_instruction": "下一轮优先观察重复主题是否转化为新的问题重构方向。",
-                    "llm_generated_table_memory_template": {
-                        "template_name": "dynamic_table_memory",
-                        "fields": {
-                            "resonant_patterns": "跨发言重复出现的模式",
-                            "minority_shifts": "少数但改变理解方向的观点",
-                        },
+                    "formatmemory": {
+                        "table_question": "本桌问题原文",
+                        "round_index": 1,
+                        "repeated_themes": ["证据、场景和约束需要一起讨论。"],
+                        "minority_inspiring_views": ["少数观点提醒不要把所有用户旅程平均化。"],
+                        "unresolved_tensions": ["创造性发散与落地约束之间存在张力。"],
                     },
-                    "host_generated_table_memory": {
-                        "resonant_patterns": ["证据、场景和约束需要一起讨论。"],
-                        "minority_shifts": ["少数观点提醒不要把所有用户旅程平均化。"],
-                    },
-                    "cumulative_pattern_evolution": "本桌正从抽象问题判断，逐步演化到围绕证据、场景、约束和未纳入角色来重构问题。",
-                    "recurring_patterns_across_rounds": ["证据、场景和约束需要一起讨论。"],
-                    "emerging_or_fading_signals": ["少数观点提醒不要把所有用户旅程平均化。"],
-                    "unresolved_tensions_over_time": ["创造性发散与落地约束之间存在张力。"],
-                    "round_pattern_delta": "本轮相对累计历史的新变化是：从泛泛问题判断转向可观察证据和未纳入角色。",
                     "next_round_question_seeds": ["哪个弱信号可能打开新的问题重构？"],
                 },
                 ensure_ascii=False,
             )
-        if "memory_update_instruction" in user and "bridge_intent" in user:
+        if '"agent_generated_memory"' in user:
             return json.dumps(
                 {
-                    "memory_update_instruction": "只保留这个 agent 亲自参与后形成的迁移洞见。",
-                    "llm_generated_memory_template": {
-                        "template_name": "dynamic_agent_migrant_memory",
-                        "fields": {
-                            "personal_shift": "本轮改变了 agent 判断的内容",
-                            "bridge_test": "到下一桌准备测试的连接",
-                        },
+                    "agent": {
+                        "id": "agent",
+                        "name": "speaking agent",
+                        "role": "participant",
+                        "skills": ["reframing"],
                     },
                     "agent_generated_memory": {
-                        "personal_shift": "不要把上一桌的共识当成新桌前提。",
-                        "bridge_test": "测试用户旅程分歧是否能解释当前桌的系统张力。",
+                        "skill_lens": "reframing",
+                        "personal_insight": "不要把上一桌的共识当成新桌前提。",
+                        "carry_forward_question": "用户旅程分歧是否能解释当前桌的系统张力？",
                     },
-                    "bridge_intent": "把上一桌的用户旅程分歧带到下一桌，看看它是否揭示新的问题重构方向。",
                 },
                 ensure_ascii=False,
             )
