@@ -57,48 +57,48 @@ let currentTableAgents = {};
 const phaseOrder = ["facilitate", "setup", "round_started", "rotation", "harvest", "done"];
 const agentRoleStatuses = {
   facilitator: {
-    label: "Facilitator",
+    label: "引导主持",
     initials: "F",
     tone: "green",
-    status: "Ready",
-    detail: "Waiting to shape table questions.",
-    meta: "Idle",
+    status: "就绪",
+    detail: "等待梳理各桌研讨问题。",
+    meta: "空闲",
     time: "",
   },
   host: {
-    label: "Table Hosts",
+    label: "咖啡桌长",
     initials: "H",
     tone: "amber",
-    status: "Idle",
-    detail: "Waiting to maintain table memory.",
-    meta: "No active table",
+    status: "空闲",
+    detail: "等待记录并维护各桌研讨记忆。",
+    meta: "暂无活跃桌",
     time: "",
   },
   speaker: {
-    label: "Speaking Agents",
+    label: "发言代表",
     initials: "S",
     tone: "blue",
-    status: "Idle",
-    detail: "Waiting for table discussion.",
-    meta: "No active speaker",
+    status: "空闲",
+    detail: "等待参与各桌子研讨。",
+    meta: "暂无活跃发言",
     time: "",
   },
   rotation: {
-    label: "Rotation",
+    label: "桌次轮换",
     initials: "R",
     tone: "rose",
-    status: "Idle",
-    detail: "Waiting to move speakers between tables.",
-    meta: "No route yet",
+    status: "空闲",
+    detail: "等待代表在不同研讨桌之间轮换。",
+    meta: "暂无路径",
     time: "",
   },
   harvest: {
-    label: "Global Harvest",
+    label: "全局总结",
     initials: "G",
     tone: "green",
-    status: "Idle",
-    detail: "Waiting to identify cross-table patterns and weak signals.",
-    meta: "Not started",
+    status: "空闲",
+    detail: "等待提炼跨桌的共性模式与设计机会。",
+    meta: "未开始",
     time: "",
   },
 };
@@ -178,7 +178,7 @@ newOrderBtn?.addEventListener("click", () => {
   hideQuestionEditorView();
   questionEditor.innerHTML = "";
   chatLog.innerHTML = "";
-  addMessage("facilitator", "World Cafe is ready.");
+  addMessage("facilitator", "世界咖啡研讨准备就绪。");
 });
 
 function openAgentProfile(agentId) {
@@ -193,7 +193,7 @@ function openAgentProfile(agentId) {
 
   if (avatar) avatar.textContent = agentInitials(profile.name || agentId);
   if (name) name.textContent = profile.name || agentId;
-  if (role) role.textContent = profile.role || "Participant";
+  if (role) role.textContent = profile.role || "研讨代表";
   if (skills) {
     skills.innerHTML = (profile.skills || []).map(skill => `<span>${escapeHtml(skill)}</span>`).join("");
   }
@@ -223,13 +223,13 @@ async function init() {
     speechesInput.value = config.default_speeches_per_agent || 3;
     speechesPerAgent = getSpeechesPerAgent();
     if (!config.token_configured) {
-      modelBadge.textContent += " · token missing";
+      modelBadge.textContent += " · 未配置 Token";
     }
   } catch {
-    modelBadge.textContent = "config unavailable";
+    modelBadge.textContent = "配置不可用";
   }
 
-  addMessage("facilitator", "World Cafe is ready.");
+  addMessage("facilitator", "世界咖啡研讨准备就绪。");
   renderAgentStatusDock();
   await loadAgentsForSettings();
 }
@@ -241,9 +241,9 @@ requestForm.addEventListener("submit", async (event) => {
 
   addMessage("user", request);
   updateAgentStatus("facilitator", {
-    status: "Reading context",
-    detail: "Generating one short question for each table.",
-    meta: `${getTableCount()} tables requested`,
+    status: "读取上下文中",
+    detail: "正在为各桌生成研讨引导问题。",
+    meta: `已请求 ${getTableCount()} 桌`,
   });
   setBusy(true);
   setPhase("facilitate");
@@ -257,9 +257,9 @@ requestForm.addEventListener("submit", async (event) => {
     });
     facilitatedTables = result.tables;
     updateAgentStatus("facilitator", {
-      status: "Questions ready",
-      detail: "One short question was generated for each table.",
-      meta: `${facilitatedTables.length} table questions`,
+      status: "引导问题已就绪",
+      detail: "已成功为各桌生成一个研讨引导问题。",
+      meta: `共 ${facilitatedTables.length} 桌问题`,
     });
     addMessage("facilitator", formatQuestions(facilitatedTables));
     await loadAgentsForSettings();
@@ -267,11 +267,11 @@ requestForm.addEventListener("submit", async (event) => {
     startBtn.disabled = false;
   } catch (error) {
     updateAgentStatus("facilitator", {
-      status: "Error",
+      status: "错误",
       detail: error.message,
-      meta: "Facilitation failed",
+      meta: "引导生成失败",
     });
-    setStatus("Facilitation error", "error");
+    setStatus("引导方案错误", "error");
     addMessage("error", error.message);
   } finally {
     setBusy(false);
@@ -284,11 +284,11 @@ startBtn.addEventListener("click", async () => {
 
   resetRunView();
   updateAgentStatus("facilitator", {
-    status: "Run configured",
-    detail: "The discussion setup is ready and the graph is starting.",
-    meta: `${tables.length} tables · ${getRoundCount()} rounds`,
+    status: "研讨配置就绪",
+    detail: "各桌研讨方案配置已就绪，流程图正在启动中。",
+    meta: `${tables.length} 桌 · ${getRoundCount()} 轮`,
   });
-  setStatus("Starting", "running");
+  setStatus("正在启动", "running");
   startBtn.disabled = true;
   facilitateBtn.disabled = true;
 
@@ -343,21 +343,21 @@ function handleRunEvent(event) {
     return;
   }
   if (event.type === "run_started") {
-    setStatus("Running", "running");
+    setStatus("进行中", "running");
     updateAgentStatus("facilitator", {
-      status: "Graph started",
-      detail: "The World Cafe orchestration is now running.",
-      meta: activeRun ? `${activeRun.table_count} tables` : "Run active",
+      status: "流程已启动",
+      detail: "世界咖啡流程引擎已在运行中。",
+      meta: activeRun ? `已启动 ${activeRun.table_count} 桌` : "研讨进行中",
     });
     return;
   }
   if (event.type === "pause_changed") {
     if (event.status === "pause_requested") {
-      setStatus("Pausing after current speaker", "running");
+      setStatus("等待当前发言结束后暂停", "running");
     } else if (event.status === "paused") {
-      setStatus("Paused for notes", "running");
+      setStatus("等待记录笔记", "running");
     } else if (event.status === "running") {
-      setStatus("Running", "running");
+      setStatus("进行中", "running");
     }
     return;
   }
@@ -366,26 +366,26 @@ function handleRunEvent(event) {
     return;
   }
   if (event.type === "error") {
-    setStatus("Error", "error");
+    setStatus("错误", "error");
     updateAgentStatus("facilitator", {
-      status: "Error",
-      detail: event.message || "The run reported an error.",
-      meta: "Needs attention",
+      status: "错误",
+      detail: event.message || "研讨流程报告了错误。",
+      meta: "需要处理",
     });
     addMessage("error", event.message || "运行出错，但后端没有返回详细错误。");
     newOrderBtn.hidden = false;
     return;
   }
   if (event.type === "run_complete") {
-    setStatus("Done", "");
+    setStatus("已完成", "");
     setPhase("done");
     updateAgentStatus("harvest", {
-      status: "Complete",
-      detail: "Global harvest completed and final findings are available.",
-      meta: `${traceTotal} events processed`,
+      status: "已完成",
+      detail: "全局收获汇总已完成，最终讨论洞察成果已就绪。",
+      meta: `已处理 ${traceTotal} 个事件`,
     });
     renderHarvest(event.harvest?.content || "");
-    addMessage("facilitator", "Harvest completed.");
+    addMessage("facilitator", "研讨成果全局收获汇总已完成。");
     facilitateBtn.disabled = false;
     pauseBtn.disabled = true;
     pauseBtn.textContent = "暂停标注";
@@ -404,22 +404,22 @@ function handleRunEvent(event) {
   if (seenEventKeys.has(eventKey)) return;
   seenEventKeys.add(eventKey);
   traceTotal += 1;
-  traceCount.textContent = `${traceTotal} events`;
+  traceCount.textContent = `${traceTotal} 个事件`;
   setPhase(event.stage);
 
   if (event.stage === "round_started") {
     currentRound = (metadata.round_index || 0) + 1;
     roundBadge.textContent = `${currentRound} / ${maxRounds}`;
-    setStatus(`Round ${currentRound}`, "running");
+    setStatus(`第 ${currentRound} 轮`, "running");
     updateAgentStatus("speaker", {
-      status: `Round ${currentRound} ready`,
-      detail: "Speaking agents are assigned to tables for the current round.",
+      status: `第 ${currentRound} 轮就绪`,
+      detail: "发言代表已分配到本轮各研讨桌。",
       meta: summarizeAssignments(metadata.assignments || {}),
     });
     updateAgentStatus("host", {
-      status: `Round ${currentRound} listening`,
-      detail: "Table hosts are ready to maintain local memory and process cues.",
-      meta: `${Object.keys(metadata.assignments || {}).length} active tables`,
+      status: `第 ${currentRound} 轮倾听中`,
+      detail: "各桌桌长已准备好记录局部讨论记忆并处理讨论线索。",
+      meta: `${Object.keys(metadata.assignments || {}).length} 个活动研讨桌`,
     });
     Object.entries(metadata.assignments || {}).forEach(([tableId, agentIds]) => {
       ensureRound(tableId, metadata.round_index || 0, agentIds);
@@ -429,21 +429,21 @@ function handleRunEvent(event) {
   if (event.stage === "table_discussion") {
     ensureRound(metadata.table_id, metadata.round_index || 0, metadata.agent_ids || []);
     updateAgentStatus("speaker", {
-      status: "Discussing",
-      detail: `${metadata.table_id || "Table"} discussion is active.`,
+      status: "研讨讨论中",
+      detail: `${metadata.table_id || "研讨桌"} 的讨论正活跃进行中。`,
       meta: formatRoundStatusMeta(metadata),
     });
     updateAgentStatus("host", {
-      status: "Observing table",
-      detail: `${metadata.host_id || "Host"} is maintaining table memory for ${metadata.table_id || "the table"}.`,
+      status: "观察桌子中",
+      detail: `桌长 ${metadata.host_id || "桌长"} 正在维护 ${metadata.table_id || "该桌"} 的研讨记忆。`,
       meta: formatRoundStatusMeta(metadata),
     });
   }
 
   if (event.stage === "host_opening") {
     updateAgentStatus("host", {
-      status: "Opening round",
-      detail: `${metadata.host_name || metadata.host_id || "A table host"} opened ${metadata.table_id || "a table"} with process cues.`,
+      status: "开启讨论轮次",
+      detail: `桌长 ${metadata.host_name || metadata.host_id || "桌长"} 带着引导线索开启了 ${metadata.table_id || "研讨桌"} 的讨论。`,
       meta: formatRoundStatusMeta(metadata),
     });
     appendHostOpening(metadata);
@@ -451,8 +451,8 @@ function handleRunEvent(event) {
 
   if (event.stage === "agent_contribution") {
     updateAgentStatus("speaker", {
-      status: "Speaking",
-      detail: `${metadata.agent_name || metadata.agent_id || "A speaking agent"} contributed to ${metadata.table_id || "a table"}.`,
+      status: "代表发言中",
+      detail: `发言代表 ${metadata.agent_name || metadata.agent_id || "代表"} 对 ${metadata.table_id || "研讨桌"} 发表了意见。`,
       meta: formatTurnStatusMeta(metadata),
     });
     appendContribution(metadata);
@@ -460,29 +460,29 @@ function handleRunEvent(event) {
 
   if (event.stage === "host_record") {
     updateAgentStatus("host", {
-      status: "Memory updated",
-      detail: `${metadata.host_name || metadata.host_id || "A table host"} updated memory for ${metadata.table_id || "a table"}.`,
+      status: "记录桌子记忆",
+      detail: `桌长 ${metadata.host_name || metadata.host_id || "桌长"} 更新并保存了 ${metadata.table_id || "研讨桌"} 的讨论记忆。`,
       meta: formatRoundStatusMeta(metadata),
     });
     appendHostRecord(metadata);
   }
 
   if (event.stage === "rotation") {
-    setStatus(`Rotating to round ${(metadata.next_round_index || 0) + 1}`, "running");
+    setStatus(`正在轮换至第 ${(metadata.next_round_index || 0) + 1} 轮`, "running");
     updateAgentStatus("rotation", {
-      status: "Routing speakers",
-      detail: "Non-host speaking agents are rotating to their next tables.",
+      status: "代表轮换中",
+      detail: "非桌长的发言代表正在轮换去下一张研讨桌。",
       meta: formatRotationMeta(metadata),
     });
     appendRotationRecord(metadata);
   }
 
   if (event.stage === "harvest") {
-    setStatus("Harvesting", "running");
+    setStatus("正在全局成果提炼", "running");
     updateAgentStatus("harvest", {
-      status: "Harvesting",
-      detail: "Global harvest is clustering patterns, weak signals, tensions, and opportunities.",
-      meta: `${metadata.round_count || maxRounds || "?"} rounds`,
+      status: "全局成果汇总中",
+      detail: "全局成果总结正在对共性模式、弱信号、张力以及设计机会进行聚类提炼。",
+      meta: `${metadata.round_count || maxRounds || "?"} 轮研讨`,
     });
   }
 }
@@ -532,14 +532,14 @@ function summarizeAssignments(assignments) {
     (count, agents) => count + Math.max((agents || []).length - 1, 0),
     0,
   );
-  return `${tableCount} tables · ${speakerCount} speakers`;
+  return `${tableCount} 桌 · ${speakerCount} 位发言代表`;
 }
 
 function formatRoundStatusMeta(metadata) {
   const round = Number.isFinite(Number(metadata.round_index))
-    ? `Round ${Number(metadata.round_index) + 1}`
-    : "Round ?";
-  const parts = [`${metadata.table_id || "Table ?"} · ${round}`];
+    ? `第 ${Number(metadata.round_index) + 1} 轮`
+    : "第 ? 轮";
+  const parts = [`${metadata.table_id || "研讨桌 ?"} · ${round}`];
   if (Object.prototype.hasOwnProperty.call(metadata, "background_context_chars")) {
     parts.push(`背景 ${Number(metadata.background_context_chars) || 0} 字符`);
   }
@@ -551,7 +551,7 @@ function formatRotationMeta(metadata) {
   const nextRound = Number.isFinite(Number(metadata.next_round_index))
     ? Number(metadata.next_round_index) + 1
     : "?";
-  return `${tableCount || "?"} tables · Round ${nextRound}`;
+  return `${tableCount || "?"} 桌 · 第 ${nextRound} 轮`;
 }
 
 function formatTurnStatusMeta(metadata) {
@@ -642,7 +642,7 @@ function renderAssignmentField(tableId) {
   wrapper.innerHTML = `
       <div class="assignment-meta">
       <span>桌长 ${escapeHtml(host?.name || hostId || "")}</span>
-      <span data-selected-count>${speakers.size} selected</span>
+      <span data-selected-count>已选 ${speakers.size} 人</span>
     </div>
     <select class="agent-select" multiple size="7" data-agent-select="${tableId}">
       ${options}
@@ -652,7 +652,7 @@ function renderAssignmentField(tableId) {
   select.addEventListener("change", () => {
     speakerAssignments[tableId] = [...select.selectedOptions].map((option) => option.value);
     wrapper.querySelector("[data-selected-count]").textContent =
-      `${speakerAssignments[tableId].length} selected`;
+      `已选 ${speakerAssignments[tableId].length} 人`;
   });
   return wrapper;
 }
@@ -943,8 +943,8 @@ function formatMemorySnapshot(snapshot) {
     if (snapshot.round_pattern_delta) rows.push(`本轮在累计历史中的变化：${snapshot.round_pattern_delta}`);
     addListRows(rows, "下一轮问题种子", snapshot.next_round_question_seeds);
     (snapshot.recent_rounds || []).forEach((round) => {
-      if (round.synthesis) rows.push(`Round ${round.round}：${round.synthesis}`);
-      if (round.cumulative_pattern_evolution) rows.push(`Round ${round.round} 演化：${round.cumulative_pattern_evolution}`);
+      if (round.synthesis) rows.push(`第 ${round.round} 轮汇总：${round.synthesis}`);
+      if (round.cumulative_pattern_evolution) rows.push(`第 ${round.round} 轮演化：${round.cumulative_pattern_evolution}`);
     });
     return rows;
   }
@@ -1042,7 +1042,7 @@ function resetRunView() {
   discussionPane.classList.remove("paused");
   // Clear gated-pulse highlight
   document.querySelectorAll(".table-card").forEach(card => card.classList.remove("gated-pulse"));
-  traceCount.textContent = "0 events";
+  traceCount.textContent = "0 个事件";
   harvestContent.classList.add("muted");
   harvestContent.textContent = "等待讨论完成";
   tablesGrid.innerHTML = "";
@@ -1055,24 +1055,24 @@ function resetRunView() {
 
 function resetAgentRoleStatuses() {
   updateAgentStatus("host", {
-    status: "Idle",
-    detail: "Waiting to maintain table memory.",
-    meta: "No active table",
+    status: "空闲",
+    detail: "等待记录并维护各桌研讨记忆。",
+    meta: "暂无活动桌",
   });
   updateAgentStatus("speaker", {
-    status: "Idle",
-    detail: "Waiting for table discussion.",
-    meta: "No active speaker",
+    status: "空闲",
+    detail: "等待参与各桌讨论。",
+    meta: "暂无活动发言人",
   });
   updateAgentStatus("rotation", {
-    status: "Idle",
-    detail: "Waiting to move speakers between tables.",
-    meta: "No route yet",
+    status: "空闲",
+    detail: "等待代表在不同研讨桌之间轮换。",
+    meta: "暂无路径",
   });
   updateAgentStatus("harvest", {
-    status: "Idle",
-    detail: "Waiting to identify cross-table patterns and weak signals.",
-    meta: "Not started",
+    status: "空闲",
+    detail: "等待提炼跨桌的共性模式与设计机会。",
+    meta: "未开始",
   });
 }
 
@@ -1104,7 +1104,7 @@ function buildDefaultAssignments(tables) {
 }
 
 function formatRoundMeta(agentIds) {
-  const agents = agentIds.length ? formatRotatedAssignment(agentIds) : "pending";
+  const agents = agentIds.length ? formatRotatedAssignment(agentIds) : "等待中";
   return `${agents} · 每人 ${speechesPerAgent} 次`;
 }
 
@@ -1247,7 +1247,7 @@ function activateNoteCheckpoint(checkpoint) {
   updateAgentStatus("host", {
     status: "等待换桌",
     detail: `${checkpoint.table_id} 已暂停：请完成本轮设计洞察/机会笔记，点击“换桌”后桌长才会生成本轮记忆。`,
-    meta: `Round ${Number(checkpoint.round_index) + 1}`,
+    meta: `第 ${Number(checkpoint.round_index) + 1} 轮`,
   });
   ensureRound(checkpoint.table_id, checkpoint.round_index, []);
   refreshNoteTakingControls();
@@ -1400,7 +1400,7 @@ function addSelectedNote() {
 }
 
 function renderNotebook() {
-  notebookCount.textContent = `${notebookEntries.length} notes`;
+  notebookCount.textContent = `已记录 ${notebookEntries.length} 条笔记`;
   notebookList.innerHTML = "";
   notebookEntries.forEach((entry, index) => {
     const item = document.createElement("button");

@@ -37,14 +37,14 @@
             </svg>
             <span>新研讨 (New Order)</span>
           </button>
-          <div class="status-pill" id="runStatus">Idle</div>
+          <div class="status-pill" id="runStatus">空闲</div>
         </div>
       </header>
 
       <main class="workspace">
         <section class="request-pane" aria-label="用户聊天窗口">
           <div class="pane-header">
-            <h2>Request</h2>
+            <h2>研讨主题</h2>
             <span id="roundBadge">0 / 0</span>
           </div>
 
@@ -100,11 +100,11 @@
             <div class="button-row">
               <button type="submit" id="facilitateBtn">
                 <span class="icon-sparkle">✦</span>
-                Facilitate
+                主题规划
               </button>
               <button type="button" id="startBtn" disabled>
                 <span class="icon-play">▶</span>
-                Start
+                开始研讨
               </button>
             </div>
           </form>
@@ -113,12 +113,12 @@
         <section class="discussion-pane" aria-label="讨论过程">
           <div class="discussion-toolbar">
             <div class="phase-track" id="phaseTrack">
-              <span data-phase="facilitate">Facilitate</span>
-              <span data-phase="setup">Setup</span>
-              <span data-phase="round_started">Rounds</span>
-              <span data-phase="rotation">Rotation</span>
-              <span data-phase="harvest">Harvest</span>
-              <span data-phase="done">Done</span>
+              <span data-phase="facilitate">引导</span>
+              <span data-phase="setup">配置</span>
+              <span data-phase="round_started">研讨</span>
+              <span data-phase="rotation">换桌</span>
+              <span data-phase="harvest">总结</span>
+              <span data-phase="done">完成</span>
             </div>
             <div class="agent-status-dock" id="agentStatusDock" aria-label="Agent 状态"></div>
             <button type="button" class="secondary" id="pauseBtn" disabled>暂停标注</button>
@@ -130,8 +130,8 @@
             </div>
             <aside class="notebook-panel" aria-label="标注笔记本">
               <div class="notebook-header">
-                <h2>Notebook</h2>
-                <span id="notebookCount" class="badge">0 notes</span>
+                <h2>设计笔记本</h2>
+                <span id="notebookCount" class="badge">0 条笔记</span>
               </div>
               <p class="notebook-hint">暂停后在 agent 原文中划选文字，点击“加入笔记”进行标注。</p>
               <div id="noteCheckpointPanel" class="note-checkpoint-panel" hidden>
@@ -148,8 +148,8 @@
 
       <section class="harvest-band" aria-label="全局 harvest">
         <div class="harvest-header">
-          <h2>Global Harvest</h2>
-          <span id="traceCount" class="badge">0 events</span>
+          <h2>全局成果收获</h2>
+          <span id="traceCount" class="badge">0 个事件</span>
         </div>
         <div id="harvestContent" class="markdown-lite muted">等待讨论完成</div>
         <div class="design-opportunities" aria-label="设计机会洞察">
@@ -184,18 +184,18 @@
         <div class="agent-profile-header">
           <div class="agent-large-avatar" id="modalAgentAvatar">?</div>
           <div>
-            <h3 id="modalAgentName">Agent Name</h3>
-            <span class="role-chip" id="modalAgentRole">Role</span>
+            <h3 id="modalAgentName">智能体名称</h3>
+            <span class="role-chip" id="modalAgentRole">角色</span>
           </div>
         </div>
         <div class="agent-profile-body">
           <div class="profile-section">
-            <h4>专家技能 (Skills)</h4>
+            <h4>专家技能</h4>
             <div class="skills-grid" id="modalAgentSkills"></div>
           </div>
           <div class="profile-section">
-            <h4>讨论风格与关注视角 (Style)</h4>
-            <p id="modalAgentStyle">Style details...</p>
+            <h4>讨论风格与关注视角</h4>
+            <p id="modalAgentStyle">加载中...</p>
           </div>
         </div>
       </div>
