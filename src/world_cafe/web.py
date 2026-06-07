@@ -18,10 +18,10 @@ from pydantic import BaseModel, Field
 
 from world_cafe.facilitator import facilitate_request
 from world_cafe.graph import build_world_cafe_graph, create_initial_state
-from world_cafe.llm import AnthropicCafeLLM
+from world_cafe.llm import OpenAICafeLLM
 from world_cafe.profiles import build_default_agent_profiles, load_agent_profiles
 from world_cafe.report import state_to_jsonable, write_outputs
-from world_cafe.state import AgentProfile, WorldCafeState
+from world_cafe.state import AgentProfile, UserNote, WorldCafeState
 
 
 load_dotenv()
@@ -39,6 +39,15 @@ class FacilitateBody(BaseModel):
 class TableQuestionBody(BaseModel):
     table_id: str
     question: str = Field(min_length=1)
+    parent_question: str | None = None
+    expert_skill: str | None = None
+    expert_rationale: str | None = None
+    lens: str | None = None
+    guiding_question: str | None = None
+    why_this_matters: str | None = None
+    evidence_basis: list[str] | None = None
+    avoid_solution_bias: str | None = None
+    round_subquestions: dict[str, list[str]] | None = None
 
 
 class RunCreateBody(BaseModel):
@@ -53,6 +62,26 @@ class RunCreateBody(BaseModel):
     background_filename: str = ""
 
 
+class UserNoteBody(BaseModel):
+    id: str = ""
+    text: str = ""
+    table_id: str = ""
+    round_index: int | None = None
+    speaker_name: str = ""
+    speaker_id: str = ""
+    speech_id: str = ""
+    speech_target_id: str = ""
+    created_at: str = ""
+
+
+class NoteCheckpointContinueBody(BaseModel):
+    checkpoint_id: str = Field(min_length=1)
+    table_id: str = Field(min_length=1)
+    round_index: int = Field(ge=0)
+    notes: list[UserNoteBody] = Field(default_factory=list)
+    action: str = "switch_table"
+
+
 @dataclass
 class RunSession:
     run_id: str
@@ -65,6 +94,9 @@ class RunSession:
     pause_requested: bool = False
     pause_active: bool = False
     pause_gate: asyncio.Event = field(default_factory=asyncio.Event)
+    note_checkpoints: dict[str, asyncio.Future[list[UserNote]]] = field(default_factory=dict)
+    note_checkpoint_meta: dict[str, dict[str, Any]] = field(default_factory=dict)
+    submitted_notes: dict[str, list[UserNote]] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         self.pause_gate.set()
@@ -115,6 +147,50 @@ class RunSession:
             )
         await self.pause_gate.wait()
 
+    async def wait_for_notes(self, _run_id: str, table_id: str, round_index: int) -> list[UserNote]:
+        checkpoint_id = f"{table_id}:r{round_index + 1}:{uuid.uuid4().hex[:8]}"
+        future: asyncio.Future[list[UserNote]] = asyncio.get_running_loop().create_future()
+        metadata = {
+            "checkpoint_id": checkpoint_id,
+            "run_id": self.run_id,
+            "table_id": table_id,
+            "round_index": round_index,
+            "continue_action": "switch_table",
+            "checkpoint_reason": "host_memory_before_table_switch",
+        }
+        self.note_checkpoints[checkpoint_id] = future
+        self.note_checkpoint_meta[checkpoint_id] = metadata
+        await self.publish(
+            {
+                "type": "note_checkpoint",
+                "status": "waiting_for_notes",
+                **metadata,
+            }
+        )
+        try:
+            notes = await future
+            self.submitted_notes[_note_key(table_id, round_index)] = notes
+            await self.publish(
+                {
+                    "type": "note_checkpoint",
+                    "status": "notes_submitted",
+                    "continue_action": "switch_table",
+                    "note_count": len(notes),
+                    **metadata,
+                }
+            )
+            return notes
+        finally:
+            self.note_checkpoints.pop(checkpoint_id, None)
+            self.note_checkpoint_meta.pop(checkpoint_id, None)
+
+    async def submit_notes(self, checkpoint_id: str, notes: list[UserNote]) -> bool:
+        future = self.note_checkpoints.get(checkpoint_id)
+        if future is None or future.done():
+            return False
+        future.set_result(notes)
+        return True
+
 
 app = FastAPI(title="Agent Cafe", version="0.1.0")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
@@ -129,9 +205,9 @@ async def index() -> FileResponse:
 @app.get("/api/config")
 async def config() -> dict[str, Any]:
     return {
-        "token_configured": bool(os.getenv("ANTHROPIC_AUTH_TOKEN")),
-        "base_url": os.getenv("ANTHROPIC_BASE_URL", "http://143.198.222.179:8317"),
-        "model": os.getenv("ANTHROPIC_MODEL", "gpt-5.5"),
+        "token_configured": bool(os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN")),
+        "base_url": os.getenv("OPENAI_BASE_URL") or os.getenv("ANTHROPIC_BASE_URL", "http://143.198.222.179:8317/v1"),
+        "model": os.getenv("OPENAI_MODEL") or os.getenv("ANTHROPIC_MODEL", "gpt-5.5"),
         "default_rounds": int(os.getenv("WORLD_CAFE_ROUNDS", "3")),
         "default_table_count": int(os.getenv("WORLD_CAFE_TABLES", "4")),
         "default_speakers_per_table": int(os.getenv("WORLD_CAFE_SPEAKERS_PER_TABLE", "3")),
@@ -147,16 +223,25 @@ async def agents(count: int = 32, agents_file: str | None = None) -> dict[str, A
 @app.post("/api/facilitate")
 async def facilitate(body: FacilitateBody) -> dict[str, Any]:
     try:
-        llm = _build_llm(temperature=0.25, max_tokens=1200)
-        return await facilitate_request(
-            llm,
-            body.request,
-            table_count=body.table_count,
-            background_context=body.background_context,
-            background_filename=body.background_filename,
+        timeout = _facilitation_timeout()
+        llm = _build_llm(temperature=0.25, max_tokens=500, timeout=timeout)
+        return await asyncio.wait_for(
+            facilitate_request(
+                llm,
+                body.request,
+                table_count=body.table_count,
+                background_context=body.background_context,
+                background_filename=body.background_filename,
+            ),
+            timeout=timeout + 5.0,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except TimeoutError as exc:
+        raise HTTPException(
+            status_code=504,
+            detail=f"facilitation timed out while waiting for the model gateway: {exc}",
+        ) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"facilitation failed: {exc}") from exc
 
@@ -185,6 +270,8 @@ async def create_run(body: RunCreateBody, background_tasks: BackgroundTasks) -> 
             speeches_per_agent=body.speeches_per_agent,
             background_context=body.background_context,
             background_filename=body.background_filename,
+            table_specs=_table_specs_from_request(body.tables),
+            table_question_plan={"tables": [_table_spec_from_body(table) for table in body.tables]},
             assignments=assignments,
             hosts=hosts,
             run_id=run_id,
@@ -225,6 +312,29 @@ async def resume_run(run_id: str) -> dict[str, Any]:
     return _run_snapshot(session)
 
 
+@app.post("/api/runs/{run_id}/note-checkpoint/continue")
+async def continue_note_checkpoint(run_id: str, body: NoteCheckpointContinueBody) -> dict[str, Any]:
+    session = _get_session(run_id)
+    metadata = session.note_checkpoint_meta.get(body.checkpoint_id)
+    if metadata is None:
+        raise HTTPException(status_code=409, detail="note checkpoint is no longer active")
+    if metadata["table_id"] != body.table_id or metadata["round_index"] != body.round_index:
+        raise HTTPException(status_code=400, detail="note checkpoint table/round mismatch")
+    notes = _normalize_user_notes(body)
+    accepted = await session.submit_notes(body.checkpoint_id, notes)
+    if not accepted:
+        raise HTTPException(status_code=409, detail="note checkpoint is no longer accepting notes")
+    return {
+        "run_id": run_id,
+        "checkpoint_id": body.checkpoint_id,
+        "table_id": body.table_id,
+        "round_index": body.round_index,
+        "status": "notes_submitted",
+        "action": body.action or "switch_table",
+        "note_count": len(notes),
+    }
+
+
 async def _ensure_run_started(run_id: str) -> None:
     session = _get_session(run_id)
     if session.task is None:
@@ -236,7 +346,11 @@ async def _run_graph(session: RunSession) -> None:
     await session.publish({"type": "run_started", "run_id": session.run_id})
     try:
         llm = _build_llm(temperature=0.7, max_tokens=1600)
-        graph = build_world_cafe_graph(llm, pause_check=session.wait_if_paused)
+        graph = build_world_cafe_graph(
+            llm,
+            pause_check=session.wait_if_paused,
+            note_checkpoint=session.wait_for_notes,
+        )
         final_state: WorldCafeState | None = None
         async for stream_type, data in _stream_graph(graph, session.state):
             if stream_type == "custom":
@@ -306,7 +420,9 @@ def _run_snapshot(session: RunSession) -> dict[str, Any]:
         "speeches_per_agent": session.state.get("speeches_per_agent", 3),
         "pause_requested": session.pause_requested,
         "pause_active": session.pause_active,
+        "pending_note_checkpoints": list(session.note_checkpoint_meta.values()),
         "table_questions": session.state["table_questions"],
+        "table_specs": session.state.get("table_specs", {}),
         "assignments": session.state["assignments"],
         "hosts": session.state["hosts"],
         "agent_profiles": profiles,
@@ -373,8 +489,62 @@ def _build_requested_assignments(
     return hosts, assignments
 
 
-def _build_llm(*, temperature: float, max_tokens: int) -> AnthropicCafeLLM:
-    return AnthropicCafeLLM.from_env(temperature=temperature, max_tokens=max_tokens)
+def _note_key(table_id: str, round_index: int) -> str:
+    return f"{table_id}:{round_index}"
+
+
+def _normalize_user_notes(body: NoteCheckpointContinueBody) -> list[UserNote]:
+    notes: list[UserNote] = []
+    for note in body.notes:
+        text = note.text.strip()
+        if not text:
+            continue
+        note_table_id = note.table_id or body.table_id
+        note_round_index = body.round_index if note.round_index is None else note.round_index
+        if note_table_id != body.table_id or note_round_index != body.round_index:
+            continue
+        notes.append(
+            {
+                "id": note.id,
+                "text": text,
+                "table_id": body.table_id,
+                "round_index": body.round_index,
+                "speaker_name": note.speaker_name,
+                "speaker_id": note.speaker_id,
+                "speech_id": note.speech_id,
+                "speech_target_id": note.speech_target_id,
+                "created_at": note.created_at,
+            }
+        )
+    return notes
+
+
+def _table_specs_from_request(tables: list[TableQuestionBody]) -> dict[str, dict[str, Any]]:
+    return {table.table_id: _table_spec_from_body(table) for table in tables}
+
+
+def _table_spec_from_body(table: TableQuestionBody) -> dict[str, Any]:
+    return {
+        "table_id": table.table_id,
+        "parent_question": table.parent_question or "",
+        "question": table.question,
+        "guiding_question": table.guiding_question or table.question,
+        "expert_skill": table.expert_skill or "mixed",
+        "expert_rationale": table.expert_rationale or "",
+        "lens": table.lens or "reframing",
+        "why_this_matters": table.why_this_matters or "",
+        "evidence_basis": table.evidence_basis or [],
+        "avoid_solution_bias": table.avoid_solution_bias or "",
+        "round_subquestions": table.round_subquestions or {},
+    }
+
+
+def _facilitation_timeout() -> float:
+    return float(os.getenv("WORLD_CAFE_FACILITATION_TIMEOUT", os.getenv("WORLD_CAFE_LLM_TIMEOUT", "180")))
+
+
+def _build_llm(*, temperature: float, max_tokens: int, timeout: float | None = None) -> OpenAICafeLLM:
+    return OpenAICafeLLM.from_env(temperature=temperature, max_tokens=max_tokens, timeout=timeout)
 
 
 def _get_session(run_id: str) -> RunSession:

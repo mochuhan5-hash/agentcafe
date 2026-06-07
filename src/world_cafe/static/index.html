@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Agent Cafe</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260601-2" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260607-1" />
   </head>
   <body>
     <div class="app-shell">
@@ -86,6 +86,7 @@
               <span data-phase="harvest">Harvest</span>
               <span data-phase="done">Done</span>
             </div>
+            <div class="agent-status-dock" id="agentStatusDock" aria-label="Agent 状态"></div>
             <button type="button" class="secondary" id="pauseBtn" disabled>暂停标注</button>
           </div>
           <div class="discussion-layout">
@@ -98,6 +99,11 @@
                 <span id="notebookCount">0 notes</span>
               </div>
               <p class="notebook-hint">暂停后在 agent 原文中划选文字，点击“加入笔记”。</p>
+              <div id="noteCheckpointPanel" class="note-checkpoint-panel" hidden>
+                <strong id="noteCheckpointTitle">完成本桌笔记后换桌</strong>
+                <p id="noteCheckpointDetail">请先完成本桌本轮的设计洞察/机会笔记，点击“换桌”后桌长才会生成本轮记忆。</p>
+                <button type="button" id="continueNotesBtn">换桌</button>
+              </div>
               <button type="button" class="secondary" id="addNoteBtn" disabled>加入笔记</button>
               <div id="notebookList" class="notebook-list"></div>
             </aside>
@@ -135,6 +141,6 @@
       </section>
     </div>
 
-    <script src="/static/app.js?v=20260601-2" type="module"></script>
+    <script src="/static/app.js?v=20260607-2" type="module"></script>
   </body>
 </html>

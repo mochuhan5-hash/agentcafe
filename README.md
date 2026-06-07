@@ -34,7 +34,7 @@ uv sync --extra dev
 notepad .env
 ```
 
-只需要把 `ANTHROPIC_AUTH_TOKEN` 填进去；`ANTHROPIC_BASE_URL` 和模型默认已经按当前接口配置好。
+只需要把 `OPENAI_API_KEY` 填进去；`OPENAI_BASE_URL` 和模型默认已经按当前 OpenAI-compatible 接口配置好。
 
 启动前端工作台：
 
@@ -56,12 +56,12 @@ uv run world-cafe --dry-run --questions `
   "城市更新如何纳入居民声音？"
 ```
 
-调用真实 Anthropic 兼容 API：
+调用真实 OpenAI-compatible API：
 
 ```powershell
-$env:ANTHROPIC_AUTH_TOKEN="your-token"
-$env:ANTHROPIC_BASE_URL="http://143.198.222.179:8317"
-$env:ANTHROPIC_MODEL="gpt-5.5"
+$env:OPENAI_API_KEY="your-token"
+$env:OPENAI_BASE_URL="http://143.198.222.179:8317/v1"
+$env:OPENAI_MODEL="gpt-5.5"
 uv run world-cafe --questions `
   "AI 如何帮助社区共创？" `
   "老龄友好服务该怎么设计？" `

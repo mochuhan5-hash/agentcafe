@@ -21,25 +21,87 @@ class DryRunCafeLLM:
 
     async def agenerate(self, system: str, user: str) -> str:
         digest = hashlib.sha1(f"{system}\n{user}".encode("utf-8")).hexdigest()[:8]
-        if "桌长" in system or "host" in system.lower():
+        if "## opening" in user:
             return (
-                "## synthesis\n"
-                f"本轮形成了一个可继续推进的综合观点：先识别真实参与者，再围绕问题建立可验证的小实验。（trace {digest}）\n\n"
-                "## key_insights\n"
-                "- 把问题拆成参与者、场景、约束和可行动假设。\n"
-                "- 让分歧显性化，比过早达成共识更有价值。\n"
-                "- 下一轮需要把洞察连接到可观察证据。\n\n"
-                "## open_questions\n"
-                "- 哪些利益相关者还没有被纳入？\n"
-                "- 哪个假设最值得优先验证？\n\n"
-                "## tensions\n"
-                "- 创造性发散与落地约束之间存在张力。\n"
+                "## opening\n"
+                "- 哪些使用者处境最容易被平均化描述遮住？\n"
+                f"- 哪个分歧最可能改变我们理解问题的方式？（trace {digest}）\n\n"
+                "## question_seeds\n"
+                "- 哪些使用者处境最容易被平均化描述遮住？\n"
+                "- 哪个分歧最可能改变我们理解问题的方式？\n"
+            )
+        if "本轮可见结束语" in system or "本轮结束语" in user:
+            return (
+                "- 成形：讨论开始把抽象判断落到可观察情境。\n"
+                "- 模糊：证据强度、边缘用户和利益相关者边界还没说透。\n"
+                "- 冲突：快速收束和保留分歧之间仍有拉扯。\n"
+                f"- 带走：下一轮追问哪个弱信号能打开**新的设计机会**？（trace {digest}）"
+            )
+        if "host_memory_update_instruction" in user:
+            return json.dumps(
+                {
+                    "synthesis": f"本轮桌面记忆显示，参与者正在把抽象判断转成可观察的情境差异。（trace {digest}）",
+                    "key_insights": [
+                        "把问题拆成参与者、场景、约束和可行动假设。",
+                        "让分歧显性化，比过早达成共识更有价值。",
+                    ],
+                    "stable_patterns": ["证据、场景和约束需要一起讨论。"],
+                    "incomplete_or_weak_patterns": ["边缘用户的差异仍缺少具体证据。"],
+                    "contested_points": ["先收束行动假设，还是继续保留分歧。"],
+                    "open_questions": [
+                        "哪些利益相关者还没有被纳入？",
+                        "哪个假设最值得优先验证？",
+                    ],
+                    "tensions": ["创造性发散与落地约束之间存在张力。"],
+                    "blind_spots_or_ambiguities": ["未纳入角色是否会改变问题边界。"],
+                    "source_context_anchor": ["用户上传材料中的任务背景与用户痛点。"],
+                    "host_memory_update_instruction": "下一轮优先观察重复主题是否转化为新的问题重构方向。",
+                    "llm_generated_table_memory_template": {
+                        "template_name": "dynamic_table_memory",
+                        "fields": {
+                            "resonant_patterns": "跨发言重复出现的模式",
+                            "minority_shifts": "少数但改变理解方向的观点",
+                        },
+                    },
+                    "host_generated_table_memory": {
+                        "resonant_patterns": ["证据、场景和约束需要一起讨论。"],
+                        "minority_shifts": ["少数观点提醒不要把所有用户旅程平均化。"],
+                    },
+                    "cumulative_pattern_evolution": "本桌正从抽象问题判断，逐步演化到围绕证据、场景、约束和未纳入角色来重构问题。",
+                    "recurring_patterns_across_rounds": ["证据、场景和约束需要一起讨论。"],
+                    "emerging_or_fading_signals": ["少数观点提醒不要把所有用户旅程平均化。"],
+                    "unresolved_tensions_over_time": ["创造性发散与落地约束之间存在张力。"],
+                    "round_pattern_delta": "本轮相对累计历史的新变化是：从泛泛问题判断转向可观察证据和未纳入角色。",
+                    "next_round_question_seeds": ["哪个弱信号可能打开新的问题重构？"],
+                },
+                ensure_ascii=False,
+            )
+        if "memory_update_instruction" in user and "bridge_intent" in user:
+            return json.dumps(
+                {
+                    "memory_update_instruction": "只保留这个 agent 亲自参与后形成的迁移洞见。",
+                    "llm_generated_memory_template": {
+                        "template_name": "dynamic_agent_migrant_memory",
+                        "fields": {
+                            "personal_shift": "本轮改变了 agent 判断的内容",
+                            "bridge_test": "到下一桌准备测试的连接",
+                        },
+                    },
+                    "agent_generated_memory": {
+                        "personal_shift": "不要把上一桌的共识当成新桌前提。",
+                        "bridge_test": "测试用户旅程分歧是否能解释当前桌的系统张力。",
+                    },
+                    "bridge_intent": "把上一桌的用户旅程分歧带到下一桌，看看它是否揭示新的问题重构方向。",
+                },
+                ensure_ascii=False,
             )
         if "全局 harvest" in system or "global harvest" in system.lower():
             return (
                 "## Shared Patterns\n"
                 "- 多桌都在从抽象议题转向可验证行动。\n"
                 "- 桌长记忆帮助后续轮次避免重复讨论。\n\n"
+                "## Weak Signals\n"
+                "- 少数观点提示：被平均化的边缘用户可能暴露新的设计机会。\n\n"
                 "## Cross-table Tensions\n"
                 "- 开放探索与阶段性收束需要节奏控制。\n\n"
                 "## Next Experiments\n"
@@ -51,8 +113,8 @@ class DryRunCafeLLM:
         )
 
 
-class AnthropicCafeLLM:
-    """Minimal Anthropic Messages client for Anthropic-compatible gateways."""
+class OpenAICafeLLM:
+    """Minimal OpenAI-compatible Chat Completions client."""
 
     def __init__(
         self,
@@ -67,7 +129,7 @@ class AnthropicCafeLLM:
         retries: int = 1,
     ) -> None:
         if not auth_token:
-            raise ValueError("ANTHROPIC_AUTH_TOKEN is required")
+            raise ValueError("OPENAI_API_KEY is required")
         self.auth_token = auth_token
         self.base_url = base_url.rstrip("/")
         self.model = model
@@ -78,14 +140,20 @@ class AnthropicCafeLLM:
         self._semaphore = asyncio.Semaphore(max(1, concurrency))
 
     @classmethod
-    def from_env(cls, *, temperature: float = 0.7, max_tokens: int = 1600) -> "AnthropicCafeLLM":
+    def from_env(
+        cls,
+        *,
+        temperature: float = 0.7,
+        max_tokens: int = 1600,
+        timeout: float | None = None,
+    ) -> "OpenAICafeLLM":
         return cls(
-            auth_token=os.getenv("ANTHROPIC_AUTH_TOKEN", ""),
-            base_url=os.getenv("ANTHROPIC_BASE_URL", "http://143.198.222.179:8317"),
-            model=os.getenv("ANTHROPIC_MODEL", "gpt-5.5"),
+            auth_token=os.getenv("OPENAI_API_KEY") or os.getenv("ANTHROPIC_AUTH_TOKEN", ""),
+            base_url=os.getenv("OPENAI_BASE_URL") or os.getenv("ANTHROPIC_BASE_URL", "http://143.198.222.179:8317/v1"),
+            model=os.getenv("OPENAI_MODEL") or os.getenv("ANTHROPIC_MODEL", "gpt-5.5"),
             temperature=temperature,
             max_tokens=max_tokens,
-            timeout=float(os.getenv("WORLD_CAFE_LLM_TIMEOUT", "180")),
+            timeout=timeout if timeout is not None else float(os.getenv("WORLD_CAFE_LLM_TIMEOUT", "180")),
             concurrency=int(os.getenv("WORLD_CAFE_LLM_CONCURRENCY", "3")),
             retries=int(os.getenv("WORLD_CAFE_LLM_RETRIES", "1")),
         )
@@ -95,13 +163,13 @@ class AnthropicCafeLLM:
             "model": self.model,
             "max_tokens": self.max_tokens,
             "temperature": self.temperature,
-            "system": system,
-            "messages": [{"role": "user", "content": user}],
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": user},
+            ],
         }
         headers = {
             "content-type": "application/json",
-            "anthropic-version": "2023-06-01",
-            "x-api-key": self.auth_token,
             "authorization": f"Bearer {self.auth_token}",
         }
         async with self._semaphore:
@@ -111,32 +179,46 @@ class AnthropicCafeLLM:
 
     async def _post_with_retries(self, payload: dict, headers: dict[str, str]) -> httpx.Response:
         last_error: Exception | None = None
-        async with httpx.AsyncClient(timeout=self.timeout) as client:
-            for attempt in range(self.retries + 1):
-                try:
-                    response = await client.post(
-                        f"{self.base_url}/v1/messages",
-                        json=payload,
-                        headers=headers,
+        for attempt in range(self.retries + 1):
+            try:
+                chat_url = self._chat_completions_url()
+                response = await asyncio.to_thread(
+                    self._post_sync,
+                    chat_url,
+                    payload,
+                    headers,
+                )
+                if response.status_code >= 400:
+                    raise RuntimeError(
+                        "AI API request failed "
+                        f"with HTTP {response.status_code}: {response.text[:500]}"
                     )
-                    if response.status_code >= 400:
-                        raise RuntimeError(
-                            "AI API request failed "
-                            f"with HTTP {response.status_code}: {response.text[:500]}"
-                        )
-                    return response
-                except httpx.TimeoutException as exc:
-                    last_error = TimeoutError(
-                        f"AI API request timed out after {self.timeout:.0f}s "
-                        f"(attempt {attempt + 1}/{self.retries + 1}, model={self.model})"
-                    )
-                except httpx.HTTPError as exc:
-                    last_error = RuntimeError(f"AI API request failed: {exc!r}")
-                if attempt < self.retries:
-                    await asyncio.sleep(1.5 * (attempt + 1))
+                return response
+            except httpx.TimeoutException as exc:
+                last_error = TimeoutError(
+                    f"AI API request timed out after {self.timeout:.0f}s "
+                    f"(attempt {attempt + 1}/{self.retries + 1}, model={self.model})"
+                )
+            except httpx.HTTPError as exc:
+                last_error = RuntimeError(f"AI API request failed: {exc!r}")
+            if attempt < self.retries:
+                await asyncio.sleep(1.5 * (attempt + 1))
         if last_error is None:
             raise RuntimeError("AI API request failed for an unknown reason")
         raise last_error
+
+    def _chat_completions_url(self) -> str:
+        base_url = self.base_url.rstrip("/")
+        if base_url.endswith("/v1"):
+            return f"{base_url}/chat/completions"
+        return f"{base_url}/v1/chat/completions"
+
+    def _post_sync(self, url: str, payload: dict, headers: dict[str, str]) -> httpx.Response:
+        with httpx.Client(timeout=self.timeout) as client:
+            return client.post(url, json=payload, headers=headers)
+
+
+AnthropicCafeLLM = OpenAICafeLLM
 
 
 class LangChainCafeLLM:

@@ -31,7 +31,44 @@ class AgentContribution(TypedDict):
     cycle_index: int
 
 
-class TableMemory(TypedDict):
+class UserNote(TypedDict, total=False):
+    id: str
+    text: str
+    table_id: str
+    round_index: int
+    speaker_name: str
+    speaker_id: str
+    speech_id: str
+    speech_target_id: str
+    created_at: str
+
+
+class TableSpec(TypedDict, total=False):
+    table_id: str
+    parent_question: str
+    question: str
+    expert_skill: str
+    expert_rationale: str
+    lens: str
+    guiding_question: str
+    why_this_matters: str
+    evidence_basis: list[str]
+    avoid_solution_bias: str
+    round_subquestions: dict[str, list[str]]
+
+
+class CarryOverPacket(TypedDict, total=False):
+    agent_id: str
+    from_table: str
+    to_table: str
+    after_round: int
+    memory_update_instruction: str
+    llm_generated_memory_template: dict[str, Any]
+    agent_generated_memory: dict[str, Any] | str
+    bridge_intent: str
+
+
+class TableMemory(TypedDict, total=False):
     table_id: str
     question: str
     host_id: str
@@ -39,20 +76,40 @@ class TableMemory(TypedDict):
     key_insights: list[str]
     open_questions: list[str]
     tensions: list[str]
+    stable_patterns: list[str]
+    incomplete_or_weak_patterns: list[str]
+    contested_points: list[str]
+    blind_spots_or_ambiguities: list[str]
     rounds: list[dict[str, Any]]
+    source_context_anchor: list[str]
+    host_memory_update_instruction: str
+    llm_generated_table_memory_template: dict[str, Any]
+    host_generated_table_memory: dict[str, Any] | str
+    cumulative_pattern_evolution: str
+    recurring_patterns_across_rounds: list[str]
+    emerging_or_fading_signals: list[str]
+    unresolved_tensions_over_time: list[str]
+    round_pattern_delta: str
+    next_round_question_seeds: list[str]
 
 
 class TableRoundOutput(TypedDict):
     table_id: str
     question: str
+    table_spec: TableSpec
     round_index: int
     host_id: str
     agent_ids: list[str]
     contributions: list[AgentContribution]
+    host_opening: str
+    host_record_display: str
     synthesis: str
     key_insights: list[str]
     open_questions: list[str]
     tensions: list[str]
+    table_memory_update: dict[str, Any]
+    carry_over_packets: list[CarryOverPacket]
+    user_notes: list[UserNote]
 
 
 class TraceEvent(TypedDict):
@@ -66,7 +123,11 @@ class WorldCafeState(TypedDict, total=False):
     run_id: str
     stage: Stage
     table_questions: dict[str, str]
+    table_specs: dict[str, TableSpec]
+    table_question_plan: dict[str, Any]
+    expert_skill_routes: dict[str, Any]
     background_context: str
+    source_context: str
     background_filename: str
     table_count: int
     seats_per_table: int
@@ -77,6 +138,11 @@ class WorldCafeState(TypedDict, total=False):
     assignments: dict[str, list[str]]
     hosts: dict[str, str]
     table_memories: dict[str, TableMemory]
+    table_memory_templates: dict[str, Any]
+    agent_pockets: dict[str, CarryOverPacket]
+    pocket_history: Annotated[list[dict[str, Any]], operator.add]
+    host_openings: Annotated[list[dict[str, Any]], operator.add]
+    question_seed_history: Annotated[list[dict[str, Any]], operator.add]
     table_round_outputs: Annotated[list[TableRoundOutput], operator.add]
     round_summaries: Annotated[list[dict[str, Any]], operator.add]
     rotation_history: Annotated[list[dict[str, Any]], operator.add]

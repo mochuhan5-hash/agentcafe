@@ -19,10 +19,15 @@ const pauseBtn = document.querySelector("#pauseBtn");
 const addNoteBtn = document.querySelector("#addNoteBtn");
 const notebookList = document.querySelector("#notebookList");
 const notebookCount = document.querySelector("#notebookCount");
+const noteCheckpointPanel = document.querySelector("#noteCheckpointPanel");
+const noteCheckpointTitle = document.querySelector("#noteCheckpointTitle");
+const noteCheckpointDetail = document.querySelector("#noteCheckpointDetail");
+const continueNotesBtn = document.querySelector("#continueNotesBtn");
 const discussionPane = document.querySelector(".discussion-pane");
 const backgroundFileInput = document.querySelector("#backgroundFile");
 const backgroundSummary = document.querySelector("#backgroundSummary");
 const clearBackgroundBtn = document.querySelector("#clearBackgroundBtn");
+const agentStatusDock = document.querySelector("#agentStatusDock");
 
 let facilitatedTables = [];
 let activeRun = null;
@@ -36,6 +41,8 @@ let seenEventKeys = new Set();
 let notebookEntries = [];
 let noteSequence = 0;
 let pendingNoteSelection = null;
+let pendingNoteCheckpoints = [];
+let activeNoteCheckpoint = null;
 let availableAgents = [];
 let hostAssignments = {};
 let speakerAssignments = {};
@@ -43,6 +50,53 @@ let backgroundContext = "";
 let backgroundFilename = "";
 
 const phaseOrder = ["facilitate", "setup", "round_started", "rotation", "harvest", "done"];
+const agentRoleStatuses = {
+  facilitator: {
+    label: "Facilitator",
+    initials: "F",
+    tone: "green",
+    status: "Ready",
+    detail: "Waiting to shape table questions.",
+    meta: "Idle",
+    time: "",
+  },
+  host: {
+    label: "Table Hosts",
+    initials: "H",
+    tone: "amber",
+    status: "Idle",
+    detail: "Waiting to maintain table memory.",
+    meta: "No active table",
+    time: "",
+  },
+  speaker: {
+    label: "Speaking Agents",
+    initials: "S",
+    tone: "blue",
+    status: "Idle",
+    detail: "Waiting for table discussion.",
+    meta: "No active speaker",
+    time: "",
+  },
+  rotation: {
+    label: "Rotation",
+    initials: "R",
+    tone: "rose",
+    status: "Idle",
+    detail: "Waiting to move speakers between tables.",
+    meta: "No route yet",
+    time: "",
+  },
+  harvest: {
+    label: "Global Harvest",
+    initials: "G",
+    tone: "green",
+    status: "Idle",
+    detail: "Waiting to identify cross-table patterns and weak signals.",
+    meta: "Not started",
+    time: "",
+  },
+};
 
 init();
 
@@ -83,10 +137,11 @@ clearBackgroundBtn.addEventListener("click", clearBackground);
 pauseBtn.addEventListener("click", togglePause);
 addNoteBtn.addEventListener("mousedown", (event) => event.preventDefault());
 addNoteBtn.addEventListener("click", addSelectedNote);
+continueNotesBtn?.addEventListener("click", submitActiveNoteCheckpoint);
 
 document.addEventListener("selectionchange", () => {
   pendingNoteSelection = getSelectedDiscussionSelection();
-  addNoteBtn.disabled = !isPaused || !pendingNoteSelection;
+  addNoteBtn.disabled = !isNoteTakingActive() || !pendingNoteSelection;
 });
 
 async function init() {
@@ -106,6 +161,7 @@ async function init() {
   }
 
   addMessage("facilitator", "World Cafe is ready.");
+  renderAgentStatusDock();
   await loadAgentsForSettings();
 }
 
@@ -115,6 +171,11 @@ requestForm.addEventListener("submit", async (event) => {
   if (!request) return;
 
   addMessage("user", request);
+  updateAgentStatus("facilitator", {
+    status: "Reading context",
+    detail: "Generating one short question for each table.",
+    meta: `${getTableCount()} tables requested`,
+  });
   setBusy(true);
   setPhase("facilitate");
 
@@ -126,11 +187,22 @@ requestForm.addEventListener("submit", async (event) => {
       background_filename: backgroundFilename,
     });
     facilitatedTables = result.tables;
-    addMessage("facilitator", `${result.facilitation_note}\n\n${formatQuestions(facilitatedTables)}`);
+    updateAgentStatus("facilitator", {
+      status: "Questions ready",
+      detail: "One short question was generated for each table.",
+      meta: `${facilitatedTables.length} table questions`,
+    });
+    addMessage("facilitator", formatQuestions(facilitatedTables));
     await loadAgentsForSettings();
     renderQuestionEditor(facilitatedTables);
     startBtn.disabled = false;
   } catch (error) {
+    updateAgentStatus("facilitator", {
+      status: "Error",
+      detail: error.message,
+      meta: "Facilitation failed",
+    });
+    setStatus("Facilitation error", "error");
     addMessage("error", error.message);
   } finally {
     setBusy(false);
@@ -142,6 +214,11 @@ startBtn.addEventListener("click", async () => {
   if (tables.length !== getTableCount()) return;
 
   resetRunView();
+  updateAgentStatus("facilitator", {
+    status: "Run configured",
+    detail: "The discussion setup is ready and the graph is starting.",
+    meta: `${tables.length} tables · ${getRoundCount()} rounds`,
+  });
   setStatus("Starting", "running");
   startBtn.disabled = true;
   facilitateBtn.disabled = true;
@@ -196,6 +273,11 @@ function handleRunEvent(event) {
   }
   if (event.type === "run_started") {
     setStatus("Running", "running");
+    updateAgentStatus("facilitator", {
+      status: "Graph started",
+      detail: "The World Cafe orchestration is now running.",
+      meta: activeRun ? `${activeRun.table_count} tables` : "Run active",
+    });
     return;
   }
   if (event.type === "pause_changed") {
@@ -208,20 +290,37 @@ function handleRunEvent(event) {
     }
     return;
   }
+  if (event.type === "note_checkpoint") {
+    handleNoteCheckpointEvent(event);
+    return;
+  }
   if (event.type === "error") {
     setStatus("Error", "error");
+    updateAgentStatus("facilitator", {
+      status: "Error",
+      detail: event.message || "The run reported an error.",
+      meta: "Needs attention",
+    });
     addMessage("error", event.message || "运行出错，但后端没有返回详细错误。");
     return;
   }
   if (event.type === "run_complete") {
     setStatus("Done", "");
     setPhase("done");
+    updateAgentStatus("harvest", {
+      status: "Complete",
+      detail: "Global harvest completed and final findings are available.",
+      meta: `${traceTotal} events processed`,
+    });
     renderHarvest(event.harvest?.content || "");
     addMessage("facilitator", "Harvest completed.");
     facilitateBtn.disabled = false;
     pauseBtn.disabled = true;
     pauseBtn.textContent = "暂停标注";
     isPaused = false;
+    activeNoteCheckpoint = null;
+    pendingNoteCheckpoints = [];
+    hideNoteCheckpointPanel();
     discussionPane.classList.remove("paused");
     return;
   }
@@ -239,6 +338,16 @@ function handleRunEvent(event) {
     currentRound = (metadata.round_index || 0) + 1;
     roundBadge.textContent = `${currentRound} / ${maxRounds}`;
     setStatus(`Round ${currentRound}`, "running");
+    updateAgentStatus("speaker", {
+      status: `Round ${currentRound} ready`,
+      detail: "Speaking agents are assigned to tables for the current round.",
+      meta: summarizeAssignments(metadata.assignments || {}),
+    });
+    updateAgentStatus("host", {
+      status: `Round ${currentRound} listening`,
+      detail: "Table hosts are ready to maintain local memory and process cues.",
+      meta: `${Object.keys(metadata.assignments || {}).length} active tables`,
+    });
     Object.entries(metadata.assignments || {}).forEach(([tableId, agentIds]) => {
       ensureRound(tableId, metadata.round_index || 0, agentIds);
     });
@@ -246,23 +355,141 @@ function handleRunEvent(event) {
 
   if (event.stage === "table_discussion") {
     ensureRound(metadata.table_id, metadata.round_index || 0, metadata.agent_ids || []);
+    updateAgentStatus("speaker", {
+      status: "Discussing",
+      detail: `${metadata.table_id || "Table"} discussion is active.`,
+      meta: formatRoundStatusMeta(metadata),
+    });
+    updateAgentStatus("host", {
+      status: "Observing table",
+      detail: `${metadata.host_id || "Host"} is maintaining table memory for ${metadata.table_id || "the table"}.`,
+      meta: formatRoundStatusMeta(metadata),
+    });
+  }
+
+  if (event.stage === "host_opening") {
+    updateAgentStatus("host", {
+      status: "Opening round",
+      detail: `${metadata.host_name || metadata.host_id || "A table host"} opened ${metadata.table_id || "a table"} with process cues.`,
+      meta: formatRoundStatusMeta(metadata),
+    });
+    appendHostOpening(metadata);
   }
 
   if (event.stage === "agent_contribution") {
+    updateAgentStatus("speaker", {
+      status: "Speaking",
+      detail: `${metadata.agent_name || metadata.agent_id || "A speaking agent"} contributed to ${metadata.table_id || "a table"}.`,
+      meta: formatTurnStatusMeta(metadata),
+    });
     appendContribution(metadata);
   }
 
   if (event.stage === "host_record") {
+    updateAgentStatus("host", {
+      status: "Memory updated",
+      detail: `${metadata.host_name || metadata.host_id || "A table host"} updated memory for ${metadata.table_id || "a table"}.`,
+      meta: formatRoundStatusMeta(metadata),
+    });
     appendHostRecord(metadata);
   }
 
   if (event.stage === "rotation") {
     setStatus(`Rotating to round ${(metadata.next_round_index || 0) + 1}`, "running");
+    updateAgentStatus("rotation", {
+      status: "Routing speakers",
+      detail: "Non-host speaking agents are rotating to their next tables.",
+      meta: formatRotationMeta(metadata),
+    });
+    appendRotationRecord(metadata);
   }
 
   if (event.stage === "harvest") {
     setStatus("Harvesting", "running");
+    updateAgentStatus("harvest", {
+      status: "Harvesting",
+      detail: "Global harvest is clustering patterns, weak signals, tensions, and opportunities.",
+      meta: `${metadata.round_count || maxRounds || "?"} rounds`,
+    });
   }
+}
+
+function renderAgentStatusDock() {
+  if (!agentStatusDock) return;
+  agentStatusDock.innerHTML = Object.entries(agentRoleStatuses)
+    .map(([key, item]) => renderAgentStatusAvatar(key, item))
+    .join("");
+}
+
+function renderAgentStatusAvatar(key, item) {
+  const time = item.time ? `<span>${escapeHtml(item.time)}</span>` : "";
+  return `
+    <button
+      type="button"
+      class="agent-status-avatar ${escapeHtml(item.tone || "")}"
+      data-agent-role="${escapeHtml(key)}"
+      aria-label="${escapeHtml(item.label)} status: ${escapeHtml(item.status)}"
+    >
+      <span class="avatar-mark">${escapeHtml(item.initials)}</span>
+      <span class="avatar-label">${escapeHtml(item.label)}</span>
+      <span class="agent-status-card" role="tooltip">
+        <strong>${escapeHtml(item.label)}</strong>
+        <em>${escapeHtml(item.status)}</em>
+        <span>${escapeHtml(item.meta || "")}</span>
+        <p>${escapeHtml(item.detail || "")}</p>
+        ${time}
+      </span>
+    </button>
+  `;
+}
+
+function updateAgentStatus(key, updates) {
+  if (!agentRoleStatuses[key]) return;
+  agentRoleStatuses[key] = {
+    ...agentRoleStatuses[key],
+    ...updates,
+    time: new Date().toLocaleTimeString(),
+  };
+  renderAgentStatusDock();
+}
+
+function summarizeAssignments(assignments) {
+  const tableCount = Object.keys(assignments).length;
+  const speakerCount = Object.values(assignments).reduce(
+    (count, agents) => count + Math.max((agents || []).length - 1, 0),
+    0,
+  );
+  return `${tableCount} tables · ${speakerCount} speakers`;
+}
+
+function formatRoundStatusMeta(metadata) {
+  const round = Number.isFinite(Number(metadata.round_index))
+    ? `Round ${Number(metadata.round_index) + 1}`
+    : "Round ?";
+  const parts = [`${metadata.table_id || "Table ?"} · ${round}`];
+  if (Object.prototype.hasOwnProperty.call(metadata, "background_context_chars")) {
+    parts.push(`背景 ${Number(metadata.background_context_chars) || 0} 字符`);
+  }
+  return parts.join(" · ");
+}
+
+function formatRotationMeta(metadata) {
+  const tableCount = Object.keys(metadata.assignments || {}).length;
+  const nextRound = Number.isFinite(Number(metadata.next_round_index))
+    ? Number(metadata.next_round_index) + 1
+    : "?";
+  return `${tableCount || "?"} tables · Round ${nextRound}`;
+}
+
+function formatTurnStatusMeta(metadata) {
+  const roundMeta = formatRoundStatusMeta(metadata);
+  const turn = Number.isFinite(Number(metadata.turn_index))
+    ? `总第 ${Number(metadata.turn_index) + 1} 位`
+    : "总第 ? 位";
+  const cycle = Number.isFinite(Number(metadata.cycle_index))
+    ? `第 ${Number(metadata.cycle_index) + 1} 次发言`
+    : "第 ? 次发言";
+  return `${roundMeta} · ${cycle} · ${turn}`;
 }
 
 function getTraceEventKey(event, metadata) {
@@ -283,10 +510,12 @@ function renderQuestionEditor(tables) {
   questionEditor.innerHTML = "";
   buildDefaultAssignments(tables);
   tables.forEach((table) => {
+    const parentQuestion = table.parent_question || requestInput.value.trim();
     const field = document.createElement("div");
     field.className = "question-field";
     field.innerHTML = `
       <label for="${table.table_id}">${table.table_id}</label>
+      <strong class="parent-question">${escapeHtml(parentQuestion)}</strong>
       <textarea id="${table.table_id}" data-table-id="${table.table_id}">${escapeHtml(table.question)}</textarea>
     `;
     questionEditor.append(field);
@@ -296,8 +525,13 @@ function renderQuestionEditor(tables) {
 
 function readEditedQuestions() {
   return [...questionEditor.querySelectorAll("textarea")].map((textarea) => ({
+    ...(facilitatedTables.find((table) => table.table_id === textarea.dataset.tableId) || {}),
     table_id: textarea.dataset.tableId,
+    parent_question:
+      facilitatedTables.find((table) => table.table_id === textarea.dataset.tableId)?.parent_question ||
+      requestInput.value.trim(),
     question: textarea.value.trim(),
+    guiding_question: textarea.value.trim(),
   }));
 }
 
@@ -348,16 +582,23 @@ function renderTables(run) {
   Object.entries(run.table_questions).forEach(([tableId, question]) => {
     const hostId = run.hosts[tableId];
     const hostName = profiles[hostId]?.name || hostId;
+    const tableSpec = run.table_specs?.[tableId] || {};
+    const parentQuestion = tableSpec.parent_question || "";
     const table = document.createElement("section");
     table.className = "table-card";
     table.dataset.tableId = tableId;
+    table.dataset.parentQuestion = parentQuestion;
+    table.dataset.tableQuestion = question;
     table.innerHTML = `
       <header>
         <div class="table-title">
           <h3>${tableId.replace("_", " ").toUpperCase()}</h3>
           <span class="host-tag">桌长 ${escapeHtml(hostName)}</span>
         </div>
-        <p class="table-question">${escapeHtml(question)}</p>
+        <div class="table-question">
+          ${parentQuestion ? `<strong>${escapeHtml(parentQuestion)}</strong>` : ""}
+          <span>${escapeHtml(question)}</span>
+        </div>
       </header>
       <div class="round-list" data-round-list></div>
     `;
@@ -374,19 +615,46 @@ function ensureRound(tableId, roundIndex, agentIds = []) {
   if (round) return round;
 
   const displayRound = Number(roundIndex) + 1;
+  const parentQuestion = table.dataset.parentQuestion || "";
+  const tableQuestion = table.dataset.tableQuestion || "";
   round = document.createElement("div");
   round.className = "round-block";
   round.dataset.roundIndex = roundIndex;
   round.innerHTML = `
     <div class="round-heading">
-      <span>Round ${displayRound}</span>
-      <span>${formatRoundMeta(agentIds)}</span>
+      <div class="round-question">
+        ${parentQuestion ? `<strong>${escapeHtml(parentQuestion)}</strong>` : ""}
+        <span>${escapeHtml(tableQuestion)}</span>
+      </div>
+      <div class="round-meta">
+        <span>Round ${displayRound}</span>
+        <span>${formatRoundMeta(agentIds)}</span>
+      </div>
     </div>
+    <div data-host-opening></div>
     <div data-contributions></div>
     <div data-host-record></div>
   `;
   list.append(round);
   return round;
+}
+
+function appendHostOpening(metadata) {
+  const round = ensureRound(metadata.table_id, metadata.round_index, metadata.agent_ids || []);
+  if (!round) return;
+  const slot = round.querySelector("[data-host-opening]");
+  if (!slot) return;
+  slot.innerHTML = renderAgentMessage({
+    className: "host-opening",
+    agentId: metadata.host_id,
+    agentName: metadata.host_name || metadata.host_id,
+    roleLabel: "桌长开场",
+    metaLabel: formatRoundStatusMeta(metadata),
+    content: metadata.content || "",
+    memorySnapshot: metadata.memory_snapshot,
+    tone: "host",
+  });
+  scrollTableToBottom(round);
 }
 
 function appendContribution(metadata) {
@@ -407,15 +675,26 @@ function appendContribution(metadata) {
   speech.dataset.speakerId = metadata.agent_id || "";
   speech.dataset.tableId = metadata.table_id || "";
   speech.dataset.roundIndex = metadata.round_index ?? "";
+  if (metadata.generation_error) {
+    speech.classList.add("speech-error");
+  }
   const turnLabel = Number.isFinite(Number(metadata.turn_index))
-    ? ` · turn ${Number(metadata.turn_index) + 1}`
+    ? ` · 总第 ${Number(metadata.turn_index) + 1} 位`
     : "";
   const cycleLabel = Number.isFinite(Number(metadata.cycle_index))
-    ? ` · cycle ${Number(metadata.cycle_index) + 1}`
+    ? ` · 第 ${Number(metadata.cycle_index) + 1} 次发言`
     : "";
   speech.innerHTML = `
-    <strong>${escapeHtml(metadata.agent_name || metadata.agent_id)}${escapeHtml(cycleLabel)}${escapeHtml(turnLabel)}</strong>
-    <div class="markdown-lite">${renderMarkdownLite(metadata.content || "")}</div>
+    ${renderAgentMessage({
+      className: "",
+      agentId: metadata.agent_id,
+      agentName: metadata.agent_name || metadata.agent_id,
+      roleLabel: `${cycleLabel.replace(/^ · /, "")}${turnLabel}`,
+      metaLabel: formatRoundStatusMeta(metadata),
+      content: metadata.content || "",
+      memorySnapshot: metadata.memory_snapshot,
+      tone: "speaker",
+    })}
   `;
   list.append(speech);
   scrollTableToBottom(round);
@@ -426,12 +705,146 @@ function appendHostRecord(metadata) {
   if (!round) return;
   const slot = round.querySelector("[data-host-record]");
   slot.innerHTML = `
-    <div class="host-record">
-      <strong>桌长记录 · ${escapeHtml(metadata.host_name || metadata.host_id)}</strong>
-      <div class="markdown-lite">${renderMarkdownLite(metadata.content || "")}</div>
-    </div>
+    ${renderAgentMessage({
+      className: "host-record",
+      agentId: metadata.host_id,
+      agentName: metadata.host_name || metadata.host_id,
+      roleLabel: "桌长记录",
+      metaLabel: formatRoundStatusMeta(metadata),
+      content: metadata.content || "",
+      memorySnapshot: metadata.memory_snapshot,
+      tone: "host",
+    })}
   `;
   scrollTableToBottom(round);
+}
+
+function renderAgentMessage({
+  className,
+  agentId,
+  agentName,
+  roleLabel,
+  metaLabel,
+  content,
+  memorySnapshot,
+  tone,
+}) {
+  const initials = agentInitials(agentName || agentId);
+  const classes = ["agent-message", className, tone === "host" ? "host-tone" : "speaker-tone"]
+    .filter(Boolean)
+    .join(" ");
+  return `
+    <div class="${escapeHtml(classes)}">
+      <button class="message-avatar" type="button" aria-label="${escapeHtml(agentName || agentId)} 的内在记忆">
+        <span>${escapeHtml(initials)}</span>
+        ${renderMemoryTooltip(agentName || agentId, memorySnapshot)}
+      </button>
+      <div class="message-bubble">
+        <div class="message-meta">
+          <strong>${escapeHtml(agentName || agentId)}</strong>
+          <span>${escapeHtml(roleLabel || "")}</span>
+          <em>${escapeHtml(metaLabel || "")}</em>
+        </div>
+        <div class="markdown-lite">${renderMarkdownLite(content || "")}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderMemoryTooltip(agentName, snapshot) {
+  const rows = formatMemorySnapshot(snapshot);
+  const body = rows.length
+    ? rows.map((row) => `<p>${renderInlineMarkdown(escapeHtml(row))}</p>`).join("")
+    : "<p>暂无内在记忆记录。</p>";
+  return `
+    <span class="memory-card" role="tooltip">
+      <strong>${escapeHtml(agentName)} · 内在记忆</strong>
+      ${body}
+    </span>
+  `;
+}
+
+function formatMemorySnapshot(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") return [];
+  const rows = [];
+  if (snapshot.kind === "table_host") {
+    rows.push(`当前桌面记忆：${snapshot.living_summary || "暂无"}`);
+    addListRows(rows, "保留洞察", snapshot.key_insights);
+    addListRows(rows, "开放问题", snapshot.open_questions);
+    addListRows(rows, "张力", snapshot.tensions);
+    if (snapshot.cumulative_pattern_evolution) rows.push(`累计演化：${snapshot.cumulative_pattern_evolution}`);
+    addListRows(rows, "跨轮重复模式", snapshot.recurring_patterns_across_rounds);
+    addListRows(rows, "变化中的信号", snapshot.emerging_or_fading_signals);
+    addListRows(rows, "持续未解张力", snapshot.unresolved_tensions_over_time);
+    if (snapshot.round_pattern_delta) rows.push(`本轮在累计历史中的变化：${snapshot.round_pattern_delta}`);
+    addListRows(rows, "下一轮问题种子", snapshot.next_round_question_seeds);
+    (snapshot.recent_rounds || []).forEach((round) => {
+      if (round.synthesis) rows.push(`Round ${round.round}：${round.synthesis}`);
+      if (round.cumulative_pattern_evolution) rows.push(`Round ${round.round} 演化：${round.cumulative_pattern_evolution}`);
+    });
+    return rows;
+  }
+  if (snapshot.bridge_intent) rows.push(`迁移意图：${snapshot.bridge_intent}`);
+  addObjectRows(rows, "个人迁移记忆", snapshot.agent_generated_memory);
+  return rows;
+}
+
+function addListRows(rows, label, value) {
+  if (!Array.isArray(value) || !value.length) return;
+  rows.push(`${label}：${value.join("；")}`);
+}
+
+function addObjectRows(rows, label, value) {
+  if (!value) return;
+  if (typeof value === "string") {
+    if (value.trim()) rows.push(`${label}：${value}`);
+    return;
+  }
+  if (Array.isArray(value)) {
+    addListRows(rows, label, value);
+    return;
+  }
+  if (typeof value === "object") {
+    const compact = Object.entries(value)
+      .filter(([, item]) => item !== null && item !== "")
+      .map(([key, item]) => `${key}: ${item}`)
+      .join("；");
+    if (compact) rows.push(`${label}：${compact}`);
+  }
+}
+
+function agentInitials(name) {
+  const text = String(name || "?").trim();
+  if (!text) return "?";
+  const asciiWords = text.match(/[A-Za-z0-9]+/g);
+  if (asciiWords?.length) {
+    return asciiWords.slice(0, 2).map((word) => word[0]).join("").toUpperCase();
+  }
+  return [...text].slice(0, 2).join("");
+}
+
+function appendRotationRecord(metadata) {
+  const assignments = metadata.assignments || {};
+  const nextRound = Number.isFinite(Number(metadata.next_round_index))
+    ? Number(metadata.next_round_index) + 1
+    : "?";
+  const afterRound = metadata.after_round_index ?? "unknown";
+  Object.entries(assignments).forEach(([tableId, agentIds]) => {
+    const table = tablesGrid.querySelector(`[data-table-id="${tableId}"]`);
+    if (!table) return;
+    const list = table.querySelector("[data-round-list]");
+    let record = list.querySelector(`[data-rotation-after="${afterRound}"]`);
+    if (!record) {
+      record = document.createElement("div");
+      record.className = "rotation-record";
+      record.dataset.rotationAfter = afterRound;
+      list.append(record);
+    }
+    record.innerHTML = `
+      <strong>轮换到 Round ${escapeHtml(nextRound)}</strong>
+      <p>${escapeHtml(formatRotatedAssignment(agentIds || []))}</p>
+    `;
+  });
 }
 
 function scrollTableToBottom(round) {
@@ -455,17 +868,44 @@ function resetRunView() {
   notebookEntries = [];
   noteSequence = 0;
   pendingNoteSelection = null;
+  pendingNoteCheckpoints = [];
+  activeNoteCheckpoint = null;
   pauseBtn.disabled = true;
   pauseBtn.textContent = "暂停标注";
   addNoteBtn.disabled = true;
+  hideNoteCheckpointPanel();
   discussionPane.classList.remove("paused");
   traceCount.textContent = "0 events";
   harvestContent.classList.add("muted");
   harvestContent.textContent = "等待讨论完成";
   tablesGrid.innerHTML = "";
+  resetAgentRoleStatuses();
   renderNotebook();
   phaseTrack.querySelectorAll("span").forEach((item) => {
     item.classList.remove("active", "done");
+  });
+}
+
+function resetAgentRoleStatuses() {
+  updateAgentStatus("host", {
+    status: "Idle",
+    detail: "Waiting to maintain table memory.",
+    meta: "No active table",
+  });
+  updateAgentStatus("speaker", {
+    status: "Idle",
+    detail: "Waiting for table discussion.",
+    meta: "No active speaker",
+  });
+  updateAgentStatus("rotation", {
+    status: "Idle",
+    detail: "Waiting to move speakers between tables.",
+    meta: "No route yet",
+  });
+  updateAgentStatus("harvest", {
+    status: "Idle",
+    detail: "Waiting to identify cross-table patterns and weak signals.",
+    meta: "Not started",
   });
 }
 
@@ -497,8 +937,26 @@ function buildDefaultAssignments(tables) {
 }
 
 function formatRoundMeta(agentIds) {
-  const agents = agentIds.length ? agentIds.join(" · ") : "pending";
+  const agents = agentIds.length ? formatRotatedAssignment(agentIds) : "pending";
   return `${agents} · 每人 ${speechesPerAgent} 次`;
+}
+
+function formatRotatedAssignment(agentIds) {
+  return agentIds
+    .map((agentId, index) => {
+      const name = getAgentName(agentId);
+      return index === 0 ? `桌长留守 ${name}` : name;
+    })
+    .join(" · ");
+}
+
+function getAgentName(agentId) {
+  if (!agentId) return "";
+  return (
+    activeRun?.agent_profiles?.[agentId]?.name ||
+    availableAgents.find((agent) => agent.id === agentId)?.name ||
+    agentId
+  );
 }
 
 function getTableCount() {
@@ -544,6 +1002,20 @@ function setBusy(isBusy) {
   facilitateBtn.textContent = isBusy ? "Facilitating..." : "✦ Facilitate";
 }
 
+function isNoteTakingActive() {
+  return isPaused || Boolean(activeNoteCheckpoint);
+}
+
+function refreshNoteTakingControls() {
+  discussionPane.classList.toggle("paused", isNoteTakingActive());
+  pauseBtn.disabled = !activeRun || Boolean(activeNoteCheckpoint);
+  pauseBtn.textContent = isPaused ? "继续讨论" : "暂停标注";
+  addNoteBtn.disabled = !isNoteTakingActive() || !pendingNoteSelection;
+  if (activeNoteCheckpoint) {
+    renderActiveNoteCheckpoint();
+  }
+}
+
 async function togglePause() {
   if (!activeRun) return;
   pauseBtn.disabled = true;
@@ -551,17 +1023,14 @@ async function togglePause() {
     if (!isPaused) {
       await postJson(`/api/runs/${activeRun.run_id}/pause`, {});
       isPaused = true;
-      discussionPane.classList.add("paused");
-      pauseBtn.textContent = "继续讨论";
-      addNoteBtn.disabled = !getSelectedDiscussionText();
+      pendingNoteSelection = getSelectedDiscussionSelection() || pendingNoteSelection;
+      refreshNoteTakingControls();
       setStatus("Pausing after current speaker", "running");
       return;
     }
     await postJson(`/api/runs/${activeRun.run_id}/resume`, {});
     isPaused = false;
-    discussionPane.classList.remove("paused");
-    pauseBtn.textContent = "暂停标注";
-    addNoteBtn.disabled = true;
+    refreshNoteTakingControls();
     setStatus("Running", "running");
     if (!eventSource || eventSource.readyState === EventSource.CLOSED) {
       subscribeToRun(activeRun.run_id);
@@ -569,8 +1038,132 @@ async function togglePause() {
   } catch (error) {
     addMessage("error", error.message);
   } finally {
-    pauseBtn.disabled = false;
+    refreshNoteTakingControls();
   }
+}
+
+function handleNoteCheckpointEvent(event) {
+  if (event.status === "waiting_for_notes") {
+    enqueueNoteCheckpoint(event);
+    return;
+  }
+  if (event.status === "notes_submitted") {
+    finishNoteCheckpoint(event.checkpoint_id);
+  }
+}
+
+function enqueueNoteCheckpoint(checkpoint) {
+  if (!checkpoint?.checkpoint_id) return;
+  if (activeNoteCheckpoint?.checkpoint_id === checkpoint.checkpoint_id) return;
+  if (pendingNoteCheckpoints.some((item) => item.checkpoint_id === checkpoint.checkpoint_id)) return;
+  if (!activeNoteCheckpoint) {
+    activateNoteCheckpoint(checkpoint);
+    return;
+  }
+  pendingNoteCheckpoints.push(checkpoint);
+  renderActiveNoteCheckpoint();
+}
+
+function activateNoteCheckpoint(checkpoint) {
+  activeNoteCheckpoint = checkpoint;
+  noteCheckpointPanel.hidden = false;
+  setStatus(`待换桌 · ${checkpoint.table_id} R${Number(checkpoint.round_index) + 1}`, "running");
+  updateAgentStatus("host", {
+    status: "等待换桌",
+    detail: `${checkpoint.table_id} 已暂停：请完成本轮设计洞察/机会笔记，点击“换桌”后桌长才会生成本轮记忆。`,
+    meta: `Round ${Number(checkpoint.round_index) + 1}`,
+  });
+  ensureRound(checkpoint.table_id, checkpoint.round_index, []);
+  refreshNoteTakingControls();
+}
+
+function finishNoteCheckpoint(checkpointId) {
+  pendingNoteCheckpoints = pendingNoteCheckpoints.filter((item) => item.checkpoint_id !== checkpointId);
+  if (activeNoteCheckpoint?.checkpoint_id === checkpointId) {
+    activeNoteCheckpoint = null;
+    hideNoteCheckpointPanel();
+    if (pendingNoteCheckpoints.length) {
+      activateNoteCheckpoint(pendingNoteCheckpoints.shift());
+    } else {
+      setStatus("Running", "running");
+      refreshNoteTakingControls();
+    }
+  }
+}
+
+function hideNoteCheckpointPanel() {
+  if (noteCheckpointPanel) {
+    noteCheckpointPanel.hidden = true;
+  }
+  if (continueNotesBtn) {
+    continueNotesBtn.disabled = false;
+    continueNotesBtn.textContent = "换桌";
+  }
+}
+
+function renderActiveNoteCheckpoint() {
+  if (!activeNoteCheckpoint || !noteCheckpointPanel) return;
+  const notes = getNotesForCheckpoint(activeNoteCheckpoint);
+  const roundLabel = Number(activeNoteCheckpoint.round_index) + 1;
+  const queued = pendingNoteCheckpoints.length ? ` · 另有 ${pendingNoteCheckpoints.length} 桌等待换桌` : "";
+  if (noteCheckpointTitle) {
+    noteCheckpointTitle.textContent = `${activeNoteCheckpoint.table_id} · Round ${roundLabel} · 换桌前笔记`;
+  }
+  if (noteCheckpointDetail) {
+    noteCheckpointDetail.textContent = `请先完成本桌本轮的设计洞察/机会笔记，点击“换桌”后桌长才会结合笔记生成内在记忆、输出结束语，并进入换桌。将提交 ${notes.length} 条笔记${queued}。`;
+  }
+  if (continueNotesBtn) {
+    continueNotesBtn.textContent = notes.length ? `提交 ${notes.length} 条笔记并换桌` : "无笔记，直接换桌";
+  }
+}
+
+async function submitActiveNoteCheckpoint() {
+  if (!activeRun || !activeNoteCheckpoint) return;
+  const checkpoint = activeNoteCheckpoint;
+  const notes = getNotesForCheckpoint(checkpoint).map(noteToPayload);
+  continueNotesBtn.disabled = true;
+  continueNotesBtn.textContent = "换桌中...";
+  try {
+    await postJson(`/api/runs/${activeRun.run_id}/note-checkpoint/continue`, {
+      checkpoint_id: checkpoint.checkpoint_id,
+      table_id: checkpoint.table_id,
+      round_index: Number(checkpoint.round_index),
+      action: "switch_table",
+      notes,
+    });
+    updateAgentStatus("host", {
+      status: "生成桌长记忆",
+      detail: `${checkpoint.table_id} 桌长正在结合用户标注笔记更新内在记忆，然后输出本轮结束语。`,
+      meta: `${notes.length} notes · switch table`,
+    });
+    finishNoteCheckpoint(checkpoint.checkpoint_id);
+  } catch (error) {
+    addMessage("error", error.message);
+    continueNotesBtn.disabled = false;
+    renderActiveNoteCheckpoint();
+  }
+}
+
+function getNotesForCheckpoint(checkpoint) {
+  return notebookEntries.filter(
+    (entry) =>
+      entry.tableId === checkpoint.table_id &&
+      Number(entry.roundIndex) === Number(checkpoint.round_index),
+  );
+}
+
+function noteToPayload(entry) {
+  return {
+    id: entry.id,
+    text: entry.text,
+    table_id: entry.tableId,
+    round_index: Number(entry.roundIndex),
+    speaker_name: entry.speakerName,
+    speaker_id: entry.speakerId,
+    speech_id: entry.speechId,
+    speech_target_id: entry.speechTargetId,
+    created_at: entry.createdAt,
+  };
 }
 
 function getSelectedDiscussionText() {
@@ -612,9 +1205,11 @@ function addSelectedNote() {
       text,
       speakerName: speech.dataset.speakerName || "Unknown speaker",
       speakerId: speech.dataset.speakerId || "",
+      tableId: speech.dataset.tableId || "",
+      roundIndex: Number(speech.dataset.roundIndex),
       speechId: speech.id,
       speechTargetId: highlighted?.id || speech.id,
-      round: currentRound,
+      round: Number(speech.dataset.roundIndex) + 1 || currentRound,
       createdAt: new Date().toLocaleTimeString(),
     },
   ];
@@ -633,7 +1228,7 @@ function renderNotebook() {
     item.className = "notebook-entry";
     item.dataset.noteTarget = entry.id;
     item.innerHTML = `
-      <div class="notebook-entry-meta">#${index + 1} · ${escapeHtml(entry.speakerName)} · Round ${entry.round || "?"} · ${escapeHtml(entry.createdAt)}</div>
+      <div class="notebook-entry-meta">#${index + 1} · ${escapeHtml(entry.tableId || "?")} · ${escapeHtml(entry.speakerName)} · Round ${entry.round || "?"} · ${escapeHtml(entry.createdAt)}</div>
       <p>${escapeHtml(entry.text)}</p>
     `;
     item.addEventListener("click", () => jumpToNote(entry));
@@ -710,13 +1305,22 @@ function clearBackground() {
 function addMessage(kind, content) {
   const message = document.createElement("div");
   message.className = `message ${kind}`;
-  message.textContent = content;
+  if (kind === "facilitator") {
+    message.innerHTML = `<div class="markdown-lite">${renderMarkdownLite(content)}</div>`;
+  } else {
+    message.textContent = content;
+  }
   chatLog.append(message);
   chatLog.scrollTop = chatLog.scrollHeight;
 }
 
 function formatQuestions(tables) {
-  return tables.map((table) => `${table.table_id}: ${table.question}`).join("\n");
+  return tables
+    .map((table) => {
+      const parent = table.parent_question || requestInput.value.trim();
+      return `${parent ? `**${parent}**\n` : ""}${table.table_id}: ${table.question}`;
+    })
+    .join("\n\n");
 }
 
 async function getJson(url) {
@@ -742,7 +1346,7 @@ async function readJsonResponse(response) {
 }
 
 function renderMarkdownLite(markdown) {
-  const lines = escapeHtml(markdown).split(/\r?\n/);
+  const lines = escapeHtml(emphasizeDesignOpportunities(markdown)).split(/\r?\n/);
   const html = [];
   let inList = false;
 
@@ -756,12 +1360,12 @@ function renderMarkdownLite(markdown) {
   lines.forEach((line) => {
     if (line.startsWith("### ")) {
       closeList();
-      html.push(`<h3>${line.slice(4)}</h3>`);
+      html.push(`<h3>${renderInlineMarkdown(line.slice(4))}</h3>`);
       return;
     }
     if (line.startsWith("## ")) {
       closeList();
-      html.push(`<h2>${line.slice(3)}</h2>`);
+      html.push(`<h2>${renderInlineMarkdown(line.slice(3))}</h2>`);
       return;
     }
     if (line.startsWith("- ")) {
@@ -769,7 +1373,7 @@ function renderMarkdownLite(markdown) {
         html.push("<ul>");
         inList = true;
       }
-      html.push(`<li>${line.slice(2)}</li>`);
+      html.push(`<li>${renderInlineMarkdown(line.slice(2))}</li>`);
       return;
     }
     if (!line.trim()) {
@@ -778,11 +1382,69 @@ function renderMarkdownLite(markdown) {
       return;
     }
     closeList();
-    html.push(`<p>${line}</p>`);
+    html.push(`<p>${renderInlineMarkdown(line)}</p>`);
   });
 
   closeList();
   return html.join("");
+}
+
+const designOpportunityTerms = [
+  "设计机会",
+  "新的设计机会",
+  "新机会",
+  "机会假设",
+  "机会线索",
+  "潜在机会",
+  "机会",
+  "design opportunity",
+  "opportunity hypothesis",
+  "opportunity",
+  "opportunities",
+];
+
+const designOpportunityPattern = new RegExp(
+  designOpportunityTerms.map(escapeRegExp).join("|"),
+  "i",
+);
+
+const designOpportunitySentencePattern = new RegExp(
+  `([^。！？!?；;\\n]*(?:${designOpportunityTerms.map(escapeRegExp).join("|")})[^。！？!?；;\\n]*(?:[。！？!?；;]|$))`,
+  "gi",
+);
+
+function emphasizeDesignOpportunities(markdown) {
+  const text = String(markdown || "");
+  if (!designOpportunityPattern.test(text)) return text;
+  return text
+    .split("```")
+    .map((block, index) => {
+      if (index % 2 === 1) return block;
+      return block.split(/\r?\n/).map(emphasizeDesignOpportunityLine).join("\n");
+    })
+    .join("```");
+}
+
+function emphasizeDesignOpportunityLine(line) {
+  if (!designOpportunityPattern.test(line) || line.includes("**") || line.trimStart().startsWith("#")) {
+    return line;
+  }
+  const prefix = line.match(/^(\s*(?:[-*]\s+|\d+\.\s+)?)/)?.[1] || "";
+  const body = line.slice(prefix.length);
+  return prefix + body.replace(designOpportunitySentencePattern, (sentence) => {
+    const leading = sentence.match(/^\s*/)?.[0] || "";
+    const trailing = sentence.match(/\s*$/)?.[0] || "";
+    const core = sentence.trim();
+    return core ? `${leading}**${core}**${trailing}` : sentence;
+  });
+}
+
+function renderInlineMarkdown(html) {
+  return html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 function escapeHtml(value) {
