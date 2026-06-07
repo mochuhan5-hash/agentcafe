@@ -580,14 +580,12 @@ function getTraceEventKey(event, metadata) {
 
 function showQuestionEditorView() {
   questionEditor.hidden = false;
-  if (discussionToolbar) discussionToolbar.style.display = "none";
-  if (discussionLayout) discussionLayout.style.display = "none";
+  discussionPane.classList.add("show-editor");
 }
 
 function hideQuestionEditorView() {
   questionEditor.hidden = true;
-  if (discussionToolbar) discussionToolbar.style.display = "";
-  if (discussionLayout) discussionLayout.style.display = "";
+  discussionPane.classList.remove("show-editor");
 }
 
 function renderQuestionEditor(tables) {

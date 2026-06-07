@@ -313,8 +313,8 @@ h1, h2, h3, h4 {
 }
 
 .discussion-pane {
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto 1fr;
   gap: 16px;
   min-height: 720px;
   padding: 20px;
@@ -491,8 +491,19 @@ input[type="file"] {
   font-size: 14px;
 }
 
-/* Question Editor */
+/* Question Editor & Cross-fade Transitions */
+.discussion-toolbar,
+.question-editor,
+.discussion-layout {
+  transition: 
+    opacity 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), 
+    transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
+    visibility 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
 .question-editor {
+  grid-row: 2;
+  grid-column: 1;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
@@ -500,31 +511,48 @@ input[type="file"] {
   flex: 1;
 }
 
-.question-editor[hidden] {
-  display: none !important;
+/* Editor Active State */
+.discussion-pane.show-editor .question-editor {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
-@keyframes fadeInSlideUp {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.discussion-pane.show-editor .discussion-layout {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(12px);
 }
 
-.question-editor:not([hidden]) {
-  animation: fadeInSlideUp 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+.discussion-pane.show-editor .discussion-toolbar {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-10px);
 }
 
-.discussion-layout {
-  animation: fadeInSlideUp 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+/* Discussion Active State (default / fallback) */
+.discussion-pane:not(.show-editor) .question-editor {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(12px);
 }
 
-.discussion-toolbar {
-  animation: fadeInSlideUp 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+.discussion-pane:not(.show-editor) .discussion-layout {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.discussion-pane:not(.show-editor) .discussion-toolbar {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+  transform: translateY(0);
 }
 
 .question-field {
@@ -592,6 +620,8 @@ input[type="file"] {
 
 /* Discussion Pane */
 .discussion-toolbar {
+  grid-row: 1;
+  grid-column: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -729,6 +759,8 @@ input[type="file"] {
 
 /* Discussion Layout */
 .discussion-layout {
+  grid-row: 2;
+  grid-column: 1;
   display: grid;
   flex: 1;
   grid-template-columns: minmax(0, 1fr) 300px;
