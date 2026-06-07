@@ -527,7 +527,6 @@ input[type="file"] {
     transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
     visibility 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
-
 .question-editor {
   grid-row: 2;
   grid-column: 1;
@@ -536,9 +535,9 @@ input[type="file"] {
   gap: 16px;
   overflow-y: auto;
   flex: 1;
-  max-height: 52vh;
+  height: 100%;
+  min-height: 0;
 }
-
 /* Editor Active State */
 .discussion-pane.show-editor .question-editor {
   opacity: 1;
