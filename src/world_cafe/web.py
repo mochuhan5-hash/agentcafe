@@ -48,6 +48,7 @@ class TableQuestionBody(BaseModel):
     evidence_basis: list[str] | None = None
     avoid_solution_bias: str | None = None
     round_subquestions: dict[str, list[str]] | None = None
+    agent_system_prompt: str | None = None
 
 
 class RunCreateBody(BaseModel):
@@ -538,6 +539,7 @@ def _table_spec_from_body(table: TableQuestionBody) -> dict[str, Any]:
         "evidence_basis": table.evidence_basis or [],
         "avoid_solution_bias": table.avoid_solution_bias or "",
         "round_subquestions": table.round_subquestions or {},
+        "agent_system_prompt": table.agent_system_prompt or "",
     }
 
 

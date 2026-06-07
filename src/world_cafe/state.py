@@ -55,6 +55,7 @@ class TableSpec(TypedDict, total=False):
     evidence_basis: list[str]
     avoid_solution_bias: str
     round_subquestions: dict[str, list[str]]
+    agent_system_prompt: str
 
 
 class CarryOverPacket(TypedDict, total=False):

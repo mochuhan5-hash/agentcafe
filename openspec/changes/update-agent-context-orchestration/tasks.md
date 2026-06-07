@@ -63,4 +63,4 @@
 - [x] 9.1 Run OpenSpec strict validation.
 - [x] 9.2 Run Python tests.
 - [x] 9.3 Run frontend static syntax checks.
-- [ ] 9.4 Manually smoke-test the web UI if a dev server is started.
+- [x] 9.4 Manually smoke-test the web UI if a dev server is started.

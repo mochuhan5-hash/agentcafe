@@ -24,10 +24,14 @@ const noteCheckpointTitle = document.querySelector("#noteCheckpointTitle");
 const noteCheckpointDetail = document.querySelector("#noteCheckpointDetail");
 const continueNotesBtn = document.querySelector("#continueNotesBtn");
 const discussionPane = document.querySelector(".discussion-pane");
+const discussionToolbar = document.querySelector(".discussion-toolbar");
+const discussionLayout = document.querySelector(".discussion-layout");
 const backgroundFileInput = document.querySelector("#backgroundFile");
 const backgroundSummary = document.querySelector("#backgroundSummary");
 const clearBackgroundBtn = document.querySelector("#clearBackgroundBtn");
 const agentStatusDock = document.querySelector("#agentStatusDock");
+const newOrderBtn = document.querySelector("#newOrderBtn");
+const appShell = document.querySelector(".app-shell");
 
 let facilitatedTables = [];
 let activeRun = null;
@@ -48,6 +52,7 @@ let hostAssignments = {};
 let speakerAssignments = {};
 let backgroundContext = "";
 let backgroundFilename = "";
+let currentTableAgents = {};
 
 const phaseOrder = ["facilitate", "setup", "round_started", "rotation", "harvest", "done"];
 const agentRoleStatuses = {
@@ -103,7 +108,7 @@ init();
 tableCountInput.addEventListener("change", async () => {
   await loadAgentsForSettings();
   facilitatedTables = [];
-  questionEditor.hidden = true;
+  hideQuestionEditorView();
   questionEditor.innerHTML = "";
   startBtn.disabled = true;
 });
@@ -138,6 +143,69 @@ pauseBtn.addEventListener("click", togglePause);
 addNoteBtn.addEventListener("mousedown", (event) => event.preventDefault());
 addNoteBtn.addEventListener("click", addSelectedNote);
 continueNotesBtn?.addEventListener("click", submitActiveNoteCheckpoint);
+
+// Delegate clicks on agent elements to show details modal
+document.addEventListener("click", (event) => {
+  const avatarBtn = event.target.closest("[data-avatar-agent-id]");
+  const metaStrong = event.target.closest("[data-meta-agent-id]");
+  const seatNode = event.target.closest("[data-seat-agent-id]");
+  
+  if (avatarBtn) {
+    const agentId = avatarBtn.dataset.avatarAgentId;
+    openAgentProfile(agentId);
+  } else if (metaStrong) {
+    const agentId = metaStrong.dataset.metaAgentId;
+    openAgentProfile(agentId);
+  } else if (seatNode) {
+    const agentId = seatNode.dataset.seatAgentId;
+    openAgentProfile(agentId);
+  }
+});
+
+const modalCloseBtn = document.querySelector("#modalCloseBtn");
+const modalOverlay = document.querySelector("#agentProfileModal .modal-overlay");
+modalCloseBtn?.addEventListener("click", closeAgentProfile);
+modalOverlay?.addEventListener("click", closeAgentProfile);
+
+newOrderBtn?.addEventListener("click", () => {
+  resetRunView();
+  appShell.classList.replace("mode-salon", "mode-config");
+  newOrderBtn.hidden = true;
+  startBtn.disabled = true;
+  facilitateBtn.disabled = false;
+  requestInput.value = "";
+  clearBackground();
+  hideQuestionEditorView();
+  questionEditor.innerHTML = "";
+  chatLog.innerHTML = "";
+  addMessage("facilitator", "World Cafe is ready.");
+});
+
+function openAgentProfile(agentId) {
+  const profile = activeRun?.agent_profiles?.[agentId] || availableAgents.find(a => a.id === agentId);
+  if (!profile) return;
+  const modal = document.querySelector("#agentProfileModal");
+  const avatar = document.querySelector("#modalAgentAvatar");
+  const name = document.querySelector("#modalAgentName");
+  const role = document.querySelector("#modalAgentRole");
+  const skills = document.querySelector("#modalAgentSkills");
+  const style = document.querySelector("#modalAgentStyle");
+
+  if (avatar) avatar.textContent = agentInitials(profile.name || agentId);
+  if (name) name.textContent = profile.name || agentId;
+  if (role) role.textContent = profile.role || "Participant";
+  if (skills) {
+    skills.innerHTML = (profile.skills || []).map(skill => `<span>${escapeHtml(skill)}</span>`).join("");
+  }
+  if (style) style.textContent = profile.style || "暂无风格描述。";
+
+  if (modal) modal.hidden = false;
+}
+
+function closeAgentProfile() {
+  const modal = document.querySelector("#agentProfileModal");
+  if (modal) modal.hidden = true;
+}
 
 document.addEventListener("selectionchange", () => {
   pendingNoteSelection = getSelectedDiscussionSelection();
@@ -241,6 +309,8 @@ startBtn.addEventListener("click", async () => {
     pauseBtn.disabled = false;
     renderTables(activeRun);
     subscribeToRun(activeRun.run_id);
+    appShell.classList.replace("mode-config", "mode-salon");
+    newOrderBtn.hidden = true;
   } catch (error) {
     setStatus("Error", "error");
     addMessage("error", error.message);
@@ -303,6 +373,7 @@ function handleRunEvent(event) {
       meta: "Needs attention",
     });
     addMessage("error", event.message || "运行出错，但后端没有返回详细错误。");
+    newOrderBtn.hidden = false;
     return;
   }
   if (event.type === "run_complete") {
@@ -323,6 +394,7 @@ function handleRunEvent(event) {
     pendingNoteCheckpoints = [];
     hideNoteCheckpointPanel();
     discussionPane.classList.remove("paused");
+    newOrderBtn.hidden = false;
     return;
   }
   if (event.type !== "trace") return;
@@ -506,8 +578,20 @@ function getTraceEventKey(event, metadata) {
   ].join("|");
 }
 
-function renderQuestionEditor(tables) {
+function showQuestionEditorView() {
   questionEditor.hidden = false;
+  if (discussionToolbar) discussionToolbar.style.display = "none";
+  if (discussionLayout) discussionLayout.style.display = "none";
+}
+
+function hideQuestionEditorView() {
+  questionEditor.hidden = true;
+  if (discussionToolbar) discussionToolbar.style.display = "";
+  if (discussionLayout) discussionLayout.style.display = "";
+}
+
+function renderQuestionEditor(tables) {
+  showQuestionEditorView();
   questionEditor.innerHTML = "";
   buildDefaultAssignments(tables);
   tables.forEach((table) => {
@@ -516,6 +600,10 @@ function renderQuestionEditor(tables) {
     field.innerHTML = `
       <label for="${table.table_id}">${table.table_id}</label>
       <textarea id="${table.table_id}" data-table-id="${table.table_id}">${escapeHtml(table.question)}</textarea>
+      <div style="margin-top: 10px;">
+        <label style="font-size: 11px; color: var(--muted); margin-bottom: 4px; display: block;">自定义该桌普通 Agent 提示词 (System Prompt Override)</label>
+        <textarea id="prompt-${table.table_id}" data-table-prompt-id="${table.table_id}" rows="2" placeholder="给该桌普通发言 Agent 加上额外的 System Prompt 约束/视角引导... (可选)" style="font-size: 12px; min-height: 50px;"></textarea>
+      </div>
     `;
     questionEditor.append(field);
     questionEditor.append(renderAssignmentField(table.table_id));
@@ -523,15 +611,20 @@ function renderQuestionEditor(tables) {
 }
 
 function readEditedQuestions() {
-  return [...questionEditor.querySelectorAll("textarea")].map((textarea) => ({
-    ...(facilitatedTables.find((table) => table.table_id === textarea.dataset.tableId) || {}),
-    table_id: textarea.dataset.tableId,
-    parent_question:
-      facilitatedTables.find((table) => table.table_id === textarea.dataset.tableId)?.parent_question ||
-      requestInput.value.trim(),
-    question: textarea.value.trim(),
-    guiding_question: textarea.value.trim(),
-  }));
+  return [...questionEditor.querySelectorAll("textarea[data-table-id]")].map((textarea) => {
+    const tableId = textarea.dataset.tableId;
+    const promptTextarea = questionEditor.querySelector(`textarea[data-table-prompt-id="${tableId}"]`);
+    const agentSystemPrompt = promptTextarea ? promptTextarea.value.trim() : "";
+    const matchingTable = facilitatedTables.find((table) => table.table_id === tableId) || {};
+    return {
+      ...matchingTable,
+      table_id: tableId,
+      parent_question: matchingTable.parent_question || requestInput.value.trim(),
+      question: textarea.value.trim(),
+      guiding_question: textarea.value.trim(),
+      agent_system_prompt: agentSystemPrompt,
+    };
+  });
 }
 
 function renderAssignmentField(tableId) {
@@ -596,9 +689,70 @@ function renderTables(run) {
           <span>${escapeHtml(question)}</span>
         </div>
       </header>
+      <div class="seating-chart-container" data-seating-container="${tableId}"></div>
       <div class="round-list" data-round-list></div>
     `;
     tablesGrid.append(table);
+    
+    // Draw initial seating chart
+    const initialAgents = [hostId, ...(run.assignments[tableId] || [])];
+    currentTableAgents[tableId] = initialAgents;
+    drawSeatingChart(table, tableId, initialAgents);
+  });
+}
+
+function drawSeatingChart(tableElement, tableId, agentIds, activeSpeakerId = null) {
+  const container = (tableElement || document).querySelector(`[data-seating-container="${tableId}"]`);
+  if (!container) return;
+  container.innerHTML = "";
+  
+  // Center Table node
+  const centerTable = document.createElement("div");
+  centerTable.className = "seating-chart-table";
+  centerTable.textContent = tableId.replace("table_", "T");
+  container.append(centerTable);
+  
+  if (!agentIds || agentIds.length === 0) return;
+  
+  const M = agentIds.length;
+  agentIds.forEach((agentId, i) => {
+    const name = getAgentName(agentId);
+    const initials = agentInitials(name);
+    const seat = document.createElement("div");
+    seat.className = "seating-chart-seat";
+    seat.dataset.seatAgentId = agentId;
+    
+    if (i === 0) {
+      seat.classList.add("host");
+      seat.title = `桌长: ${name}`;
+    } else {
+      seat.classList.add("speaker");
+      seat.title = `发言嘉宾: ${name}`;
+    }
+    
+    if (agentId === activeSpeakerId) {
+      seat.classList.add("active-speaker");
+      const steam = document.createElement("div");
+      steam.className = "steam-vapor";
+      steam.innerHTML = "<span></span><span></span><span></span>";
+      seat.append(steam);
+    }
+    
+    const seatContent = document.createElement("span");
+    seatContent.textContent = initials;
+    seat.append(seatContent);
+    
+    // Distribute seats radially around table (radius 42px)
+    const angle = (i * 2 * Math.PI) / M - Math.PI / 2;
+    const radius = 42;
+    const dx = radius * Math.cos(angle);
+    const dy = radius * Math.sin(angle);
+    
+    seat.style.left = `calc(50% + ${dx}px)`;
+    seat.style.top = `calc(50% + ${dy}px)`;
+    seat.style.transform = "translate(-50%, -50%)";
+    
+    container.append(seat);
   });
 }
 
@@ -606,6 +760,12 @@ function ensureRound(tableId, roundIndex, agentIds = []) {
   if (!tableId) return null;
   const table = tablesGrid.querySelector(`[data-table-id="${tableId}"]`);
   if (!table) return null;
+  
+  if (agentIds && agentIds.length > 0) {
+    currentTableAgents[tableId] = agentIds;
+    drawSeatingChart(table, tableId, agentIds);
+  }
+
   const list = table.querySelector("[data-round-list]");
   let round = list.querySelector(`[data-round-index="${roundIndex}"]`);
   if (round) return round;
@@ -649,6 +809,10 @@ function appendHostOpening(metadata) {
     tone: "host",
   });
   scrollTableToBottom(round);
+  
+  // Highlight host seat on map
+  const agents = currentTableAgents[metadata.table_id] || (metadata.agent_ids || [metadata.host_id]);
+  drawSeatingChart(null, metadata.table_id, agents, metadata.host_id);
 }
 
 function appendContribution(metadata) {
@@ -692,6 +856,10 @@ function appendContribution(metadata) {
   `;
   list.append(speech);
   scrollTableToBottom(round);
+  
+  // Highlight active speaker seat on map
+  const agents = currentTableAgents[metadata.table_id] || [metadata.agent_id];
+  drawSeatingChart(null, metadata.table_id, agents, metadata.agent_id);
 }
 
 function appendHostRecord(metadata) {
@@ -711,6 +879,10 @@ function appendHostRecord(metadata) {
     })}
   `;
   scrollTableToBottom(round);
+  
+  // Highlight host seat on map
+  const agents = currentTableAgents[metadata.table_id] || [metadata.host_id];
+  drawSeatingChart(null, metadata.table_id, agents, metadata.host_id);
 }
 
 function renderAgentMessage({
@@ -729,13 +901,13 @@ function renderAgentMessage({
     .join(" ");
   return `
     <div class="${escapeHtml(classes)}">
-      <button class="message-avatar" type="button" aria-label="${escapeHtml(agentName || agentId)} 的内在记忆">
+      <button class="message-avatar" type="button" aria-label="${escapeHtml(agentName || agentId)} 的内在记忆" data-avatar-agent-id="${escapeHtml(agentId)}">
         <span>${escapeHtml(initials)}</span>
         ${renderMemoryTooltip(agentName || agentId, memorySnapshot)}
       </button>
       <div class="message-bubble">
         <div class="message-meta">
-          <strong>${escapeHtml(agentName || agentId)}</strong>
+          <strong data-meta-agent-id="${escapeHtml(agentId)}">${escapeHtml(agentName || agentId)}</strong>
           <span>${escapeHtml(roleLabel || "")}</span>
           <em>${escapeHtml(metaLabel || "")}</em>
         </div>
@@ -868,7 +1040,10 @@ function resetRunView() {
   pauseBtn.textContent = "暂停标注";
   addNoteBtn.disabled = true;
   hideNoteCheckpointPanel();
+  hideQuestionEditorView();
   discussionPane.classList.remove("paused");
+  // Clear gated-pulse highlight
+  document.querySelectorAll(".table-card").forEach(card => card.classList.remove("gated-pulse"));
   traceCount.textContent = "0 events";
   harvestContent.classList.add("muted");
   harvestContent.textContent = "等待讨论完成";
@@ -1062,6 +1237,15 @@ function activateNoteCheckpoint(checkpoint) {
   activeNoteCheckpoint = checkpoint;
   noteCheckpointPanel.hidden = false;
   setStatus(`待换桌 · ${checkpoint.table_id} R${Number(checkpoint.round_index) + 1}`, "running");
+  
+  // Highlight active checkpoint table card
+  document.querySelectorAll(".table-card").forEach(card => card.classList.remove("gated-pulse"));
+  const tableCard = document.querySelector(`.table-card[data-table-id="${checkpoint.table_id}"]`);
+  if (tableCard) {
+    tableCard.classList.add("gated-pulse");
+    tableCard.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
+
   updateAgentStatus("host", {
     status: "等待换桌",
     detail: `${checkpoint.table_id} 已暂停：请完成本轮设计洞察/机会笔记，点击“换桌”后桌长才会生成本轮记忆。`,
@@ -1076,6 +1260,10 @@ function finishNoteCheckpoint(checkpointId) {
   if (activeNoteCheckpoint?.checkpoint_id === checkpointId) {
     activeNoteCheckpoint = null;
     hideNoteCheckpointPanel();
+    
+    // Clear highlight
+    document.querySelectorAll(".table-card").forEach(card => card.classList.remove("gated-pulse"));
+
     if (pendingNoteCheckpoints.length) {
       activateNoteCheckpoint(pendingNoteCheckpoints.shift());
     } else {

@@ -59,6 +59,8 @@ def contribution_prompt(
         "不要主导新桌，不要复述上一桌完整内容，不要直接提出完整解决方案。"
         "如果发言中出现设计机会、机会假设或类似表达，请把相关词组或句子加粗。"
     )
+    if table_spec and isinstance(table_spec, dict) and table_spec.get("agent_system_prompt"):
+        system += f"\n\n注意：在本桌发言中，请同时实际遵循以下用户自定义的 System Prompt 设定：\n{table_spec['agent_system_prompt']}"
     peers = "\n\n".join(format_agent(profile) for profile in table_agents)
     transcript = "\n\n".join(conversation) or "暂无。"
     user = (
