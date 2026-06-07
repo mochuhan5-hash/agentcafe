@@ -53,7 +53,7 @@ class TableQuestionBody(BaseModel):
 
 class RunCreateBody(BaseModel):
     tables: list[TableQuestionBody] = Field(min_length=1, max_length=8)
-    rounds: int = Field(default=3, ge=1, le=6)
+    rounds: int = Field(default=3, ge=1, le=8)
     speakers_per_table: int = Field(default=3, ge=1, le=8)
     speeches_per_agent: int = Field(default=3, ge=1, le=8)
     host_assignments: dict[str, str] | None = None

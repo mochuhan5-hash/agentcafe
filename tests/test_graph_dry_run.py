@@ -7,7 +7,8 @@ from world_cafe.graph import (
     create_initial_state,
 )
 from world_cafe.llm import DryRunCafeLLM
-from world_cafe.prompts import contribution_prompt, global_harvest_prompt, host_opening_prompt
+from world_cafe.prompts import contribution_prompt, global_harvest_prompt, host_opening_prompt, host_synthesis_prompt
+from world_cafe.state import TABLEMEMORY_USAGE_DESCRIPTION
 
 
 @pytest.mark.asyncio
@@ -24,8 +25,10 @@ async def test_world_cafe_dry_run_completes_all_rounds() -> None:
     assert len(final_state["table_round_outputs"]) == 8
     assert len(final_state["round_summaries"]) == 2
     assert len(final_state["rotation_history"]) == 1
-    assert "Shared Patterns" in final_state["harvest"]["content"]
+    assert "设计洞察" in final_state["harvest"]["content"]
     assert "structured_harvest" in final_state["harvest"]
+    assert "speaking_agent_history" in final_state["harvest"]
+    assert "round_summaries" not in final_state["harvest"]
     for output in final_state["table_round_outputs"]:
         assert len(output["contributions"]) == 9
         assert output["host_id"] not in {item["agent_id"] for item in output["contributions"]}
@@ -227,10 +230,11 @@ async def test_packet_generation_failure_still_routes_speaking_agents() -> None:
     assert packet["generation_error"] == "packet gateway failed"
     assert packet["agent"]["id"]
     assert "personal_insight" in packet["agent_generated_memory"]
+    assert "carry_forward_question" not in packet["agent_generated_memory"]
 
 
 @pytest.mark.asyncio
-async def test_model_outputs_are_preserved_when_prompt_limits_are_exceeded() -> None:
+async def test_harvest_output_is_formatted_when_prompt_limits_are_exceeded() -> None:
     class LongOutputLLM:
         async def agenerate(self, system: str, user: str) -> str:
             if "全局 harvest" in system:
@@ -257,7 +261,10 @@ async def test_model_outputs_are_preserved_when_prompt_limits_are_exceeded() -> 
 
     contribution = final_state["table_round_outputs"][0]["contributions"][0]
     assert len(contribution["content"]) == 350
-    assert len(final_state["harvest"]["content"]) == 600
+    harvest_content = final_state["harvest"]["content"]
+    assert len(harvest_content) <= 500
+    assert harvest_content.startswith("设计洞察")
+    assert "3、不超过三个后续的设计方向" in harvest_content
 
 
 @pytest.mark.asyncio
@@ -280,6 +287,10 @@ async def test_stream_events_include_hover_memory_snapshots() -> None:
     assert host_opening["metadata"]["memory_snapshot"]["kind"] == "table_host"
     assert contribution["metadata"]["memory_snapshot"]["kind"] == "speaking_agent"
     assert host_record["metadata"]["memory_snapshot"]["kind"] == "table_host"
+    assert TABLEMEMORY_USAGE_DESCRIPTION in host_record["metadata"]["memory_snapshot"]["tablememory_usage_description"]
+    assert host_record["metadata"]["memory_snapshot"]["recent_rounds"]
+    assert host_record["metadata"]["memory_snapshot"]["recent_rounds"][-1]["round"] == 1
+    assert "repeated_themes" in host_record["metadata"]["memory_snapshot"]["recent_rounds"][-1]
 
 
 @pytest.mark.asyncio
@@ -313,10 +324,19 @@ def test_prompts_limit_agent_turns_and_global_harvest_length() -> None:
         "table_id": "table_01",
         "question": "q1",
         "host_id": "agent_02",
-        "living_summary": "",
+        "living_summary": "table_01 累积了所有轮讨论的活记忆。",
         "key_insights": [],
         "open_questions": [],
         "tensions": [],
+        "formatmemory": [
+            {
+                "round_index": 1,
+                "repeated_themes": ["跨轮重复主题"],
+                "minority_inspiring_views": ["少数启发观点"],
+                "unresolved_tensions": ["持续张力"],
+            }
+        ],
+        "next_round_question_seeds": ["后续追问种子"],
         "rounds": [],
     }
 
@@ -343,9 +363,47 @@ def test_prompts_limit_agent_turns_and_global_harvest_length() -> None:
         memory=memory,
         background_context="背景上下文",
     )
-    _, harvest_user = global_harvest_prompt({"table_01": memory}, [])
+    _, host_synthesis_user = host_synthesis_prompt(
+        table_id="table_01",
+        question="q1",
+        round_index=1,
+        host=agent,
+        memory=memory,
+        table_spec={
+            "parent_question": "用户大问题",
+            "lens": "reframing",
+            "guiding_question": "q1",
+        },
+        contributions=["本轮发言"],
+        background_context="背景上下文",
+    )
+    speaking_history = [
+        {
+            "table_id": "table_01",
+            "question": "q1",
+            "round_index": 0,
+            "contributions": [
+                {
+                    "agent_id": "agent_01",
+                    "agent_name": "A",
+                    "content": "这是 speaking agent 的原始历史发言。",
+                    "turn_index": 0,
+                    "cycle_index": 0,
+                }
+            ],
+            "user_notes": [
+                {
+                    "text": "用户标记的本轮关键笔记。",
+                    "speaker_name": "A",
+                    "speaker_id": "agent_01",
+                    "speech_id": "speech_01",
+                }
+            ],
+        }
+    ]
+    _, harvest_user = global_harvest_prompt({"table_01": memory}, speaking_history)
 
-    assert "200字以内" in contribution_user
+    assert "100字以内" in contribution_user
     assert "背景材料" in contribution_user
     assert "背景上下文" in contribution_user
     assert "用户原始大问题：用户大问题" in contribution_user
@@ -353,10 +411,32 @@ def test_prompts_limit_agent_turns_and_global_harvest_length() -> None:
     assert "reframing" in contribution_user
     assert "用户原始大问题：用户大问题" in host_opening_user
     assert "只提出2-3个可直接开启讨论的简短开放问句" in host_opening_user
+    assert "【开场白，说明本轮讨论的关注点（10字以内）】" in host_opening_user
+    assert "- 【问题一（一句话引导，不要提供过多信息）】" in host_opening_user
     assert "background_context" in host_opening_user
     assert "桌长画像" not in host_opening_user
     assert "table_spec：" not in host_opening_user
-    assert "500字以内" in harvest_user
+    assert '"tablememory_usage_description"' in host_synthesis_user
+    assert TABLEMEMORY_USAGE_DESCRIPTION in host_synthesis_user
+    assert "800字以内" in harvest_user
+    speaking_index = harvest_user.index("所有 speaking agents 的历史对话原文")
+    questions_index = harvest_user.index("所有桌子的讨论问题")
+    tablememory_index = harvest_user.index("所有桌子的 tablememory")
+    notes_index = harvest_user.index("用户每轮标记的笔记")
+    assert speaking_index < questions_index < tablememory_index < notes_index
+    assert "作为 harvest 主证据（优先级最高）" in harvest_user
+    assert "所有桌子的 tablememory" in harvest_user
+    assert "table_01 累积了所有轮讨论的活记忆。" in harvest_user
+    assert "跨轮重复主题" in harvest_user
+    assert "所有 speaking agents 的历史对话原文" in harvest_user
+    assert "A (agent_01)：这是 speaking agent 的原始历史发言。" in harvest_user
+    assert "用户标记的本轮关键笔记。" in harvest_user
+    assert "轮次摘要：" not in harvest_user
+    assert "桌长记忆：" not in harvest_user
+    assert "设计洞察：" in harvest_user
+    assert "### 用户主要需求的提取" in harvest_user
+    assert "### 设计问题的重新界定" in harvest_user
+    assert "### 不超过三个后续的设计方向" in harvest_user
 
 
 def test_create_initial_state_fills_missing_agents_without_duplicate_ids() -> None:
@@ -447,6 +527,7 @@ async def test_context_orchestration_generates_host_memory_and_pockets() -> None
     memory = final_state["table_memories"]["table_01"]
     assert "formatmemory" in memory
     assert memory["formatmemory"]
+    assert memory["tablememory_usage_description"] == TABLEMEMORY_USAGE_DESCRIPTION
     assert "llm_generated_table_memory_template" not in memory
     assert "host_generated_table_memory" not in memory
 
@@ -481,8 +562,7 @@ async def test_visible_outputs_are_natural_and_bold_design_opportunities() -> No
   "agent": {"id": "agent_02", "name": "Agent Two", "role": "participant", "skills": ["edge cases"]},
   "agent_generated_memory": {
     "skill_lens": "edge cases",
-    "personal_insight": "边缘案例可能解释当前桌张力",
-    "carry_forward_question": "下一桌是否也存在类似边缘张力？"
+    "personal_insight": "边缘案例可能解释当前桌张力"
   }
 }
 """
@@ -495,7 +575,7 @@ async def test_visible_outputs_are_natural_and_bold_design_opportunities() -> No
   "opportunity_hypotheses": [{"hypothesis": "用边缘案例验证机会假设"}],
   "reframed_design_questions": [],
   "next_learning_experiments": [],
-  "display_markdown": "## Weak Signals\\n- 边缘案例暴露一个设计机会：重新定义默认旅程。"
+  "display_markdown": "设计洞察：\\n1、用户主要需求的提取：用户需要默认旅程覆盖边缘场景。\\n2、设计问题的重新界定：如何把边缘案例暴露的设计机会转化为可验证旅程。\\n3、不超过三个后续的设计方向：\\n- 重新定义默认旅程。"
 }
 """
             return "我听到一个设计机会：把边缘用户的断点当成下一轮验证线索。"
@@ -570,9 +650,12 @@ async def test_json_harvest_is_stored_as_structured_harvest() -> None:
   "weak_signal_channel": [{"signal": "rare signal", "from_table": "table_01", "why_it_matters": "novel", "risk_if_ignored": "lost opportunity"}],
   "cross_table_tensions": [{"tension": "open vs focused", "tables_involved": ["table_01"], "possible_reframe": "pace the inquiry"}],
   "opportunity_hypotheses": [{"hypothesis": "testable opportunity", "based_on": ["shared pattern"], "next_learning_action": "prototype question"}],
+  "user_needs": ["shared need"],
+  "reframed_design_problem": "How might the system keep weak signals alive?",
+  "next_design_directions": ["small probe"],
   "reframed_design_questions": ["How might the system keep weak signals alive?"],
   "next_learning_experiments": [{"experiment": "small probe", "what_to_observe": "signal quality", "why_now": "before convergence"}],
-  "display_markdown": "## Shared Patterns\\n- shared pattern\\n\\n## Weak Signals\\n- rare signal"
+  "display_markdown": "设计洞察：\\n1、用户主要需求的提取：shared need\\n2、设计问题的重新界定：How might the system keep weak signals alive?\\n3、不超过三个后续的设计方向：\\n- small probe"
 }
 """
             return await super().agenerate(system, user)
@@ -589,13 +672,45 @@ async def test_json_harvest_is_stored_as_structured_harvest() -> None:
     final_state = await graph.ainvoke(state)
 
     harvest = final_state["harvest"]
-    assert harvest["content"].startswith("## Shared Patterns")
+    assert harvest["content"].startswith("设计洞察")
+    assert harvest["structured_harvest"]["user_needs"] == ["shared need"]
+    assert harvest["structured_harvest"]["next_design_directions"] == ["small probe"]
     assert harvest["structured_harvest"]["pattern_channel"][0]["pattern"] == "shared pattern"
     assert harvest["structured_harvest"]["weak_signal_channel"][0]["signal"] == "rare signal"
 
 
-def test_json_harvest_with_unknown_fields_falls_back_to_raw_content() -> None:
+def test_json_harvest_with_unknown_fields_uses_design_insight_template() -> None:
     content = '{"summary": "模型返回了非约定字段，但仍有可读 harvest 内容。"}'
     structured = _parse_structured_harvest(content)
 
-    assert _harvest_display_content(content, structured) == content
+    display = _harvest_display_content(content, structured)
+
+    assert display.startswith("设计洞察")
+    assert "Shared Patterns" not in display
+    assert "1、用户主要需求的提取：暂无" in display
+
+
+def test_legacy_empty_harvest_template_is_not_displayed() -> None:
+    content = """
+Shared Patterns
+暂无
+
+Weak Signals
+暂无
+
+Cross-table Tensions
+暂无
+
+Reframed Questions
+暂无
+
+Next Experiments
+暂无
+"""
+    structured = _parse_structured_harvest(content)
+    display = _harvest_display_content(content, structured)
+
+    assert display.startswith("设计洞察")
+    assert "Shared Patterns" not in display
+    assert "Weak Signals" not in display
+    assert "3、不超过三个后续的设计方向" in display

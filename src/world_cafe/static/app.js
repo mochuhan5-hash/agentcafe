@@ -13,7 +13,6 @@ const harvestContent = document.querySelector("#harvestContent");
 const traceCount = document.querySelector("#traceCount");
 const tableCountInput = document.querySelector("#tableCount");
 const speakersInput = document.querySelector("#speakersPerTable");
-const roundsInput = document.querySelector("#roundCount");
 const speechesInput = document.querySelector("#speechesPerAgent");
 const pauseBtn = document.querySelector("#pauseBtn");
 const addNoteBtn = document.querySelector("#addNoteBtn");
@@ -28,6 +27,7 @@ const discussionToolbar = document.querySelector(".discussion-toolbar");
 const discussionLayout = document.querySelector(".discussion-layout");
 const backgroundFileInput = document.querySelector("#backgroundFile");
 const backgroundSummary = document.querySelector("#backgroundSummary");
+const chooseBackgroundBtn = document.querySelector("#chooseBackgroundBtn");
 const clearBackgroundBtn = document.querySelector("#clearBackgroundBtn");
 const agentStatusDock = document.querySelector("#agentStatusDock");
 const newOrderBtn = document.querySelector("#newOrderBtn");
@@ -128,7 +128,7 @@ backgroundFileInput.addEventListener("change", async () => {
     return;
   }
   const lowerName = file.name.toLowerCase();
-  if (!lowerName.endsWith(".md") && !lowerName.endsWith(".markdown")) {
+  if (!lowerName.endsWith(".md") && !lowerName.endsWith(".markdown") && !lowerName.endsWith(".txt")) {
     addMessage("error", "请上传 .md 或 .markdown 背景材料。");
     clearBackground();
     return;
@@ -139,6 +139,7 @@ backgroundFileInput.addEventListener("change", async () => {
   clearBackgroundBtn.hidden = false;
 });
 
+chooseBackgroundBtn?.addEventListener("click", () => backgroundFileInput.click());
 clearBackgroundBtn.addEventListener("click", clearBackground);
 pauseBtn.addEventListener("click", togglePause);
 addNoteBtn.addEventListener("mousedown", (event) => event.preventDefault());
@@ -239,7 +240,6 @@ async function init() {
     modelBadge.textContent = `${config.model} · ${config.base_url}${tokenLabel}`;
     tableCountInput.value = config.default_table_count || 4;
     speakersInput.value = config.default_speakers_per_table || 3;
-    roundsInput.value = config.default_rounds || 3;
     speechesInput.value = config.default_speeches_per_agent || 3;
     speechesPerAgent = getSpeechesPerAgent();
     if (!config.token_configured) {
@@ -643,7 +643,7 @@ function readEditedQuestions() {
   });
 }
 
-function renderLeftField(table) {
+function renderLeftFieldLegacy(table) {
   const tableId = table.table_id;
   const field = document.createElement("div");
   field.className = "question-field";
@@ -746,12 +746,88 @@ function refreshAgentPromptBoxes(tableId) {
   });
 }
 
-function readSpeakerAssignments() {
+function readSpeakerAssignmentsLegacy() {
   questionEditor.querySelectorAll("[data-agent-select]").forEach((select) => {
     speakerAssignments[select.dataset.agentSelect] = [...select.selectedOptions].map(
       (option) => option.value,
     );
   });
+  return speakerAssignments;
+}
+
+function renderLeftField(table) {
+  const tableId = table.table_id;
+  const field = document.createElement("div");
+  field.className = "question-field";
+
+  const hostId = hostAssignments[tableId];
+  const host = availableAgents.find((agent) => agent.id === hostId);
+  const speakers = new Set(speakerAssignments[tableId] || []);
+  const agentChoices = availableAgents
+    .filter((agent) => agent.id !== hostId)
+    .map((agent) => {
+      const selected = speakers.has(agent.id);
+      return `
+        <button
+          type="button"
+          class="agent-choice ${selected ? "selected" : ""}"
+          data-agent-choice="${escapeHtml(agent.id)}"
+          aria-pressed="${selected ? "true" : "false"}"
+        >
+          <span>${escapeHtml(agent.name)}</span>
+          <small>${escapeHtml(agent.role || agent.id)}</small>
+        </button>
+      `;
+    })
+    .join("");
+
+  field.innerHTML = `
+    <div class="question-header">
+      <label for="${tableId}">${tableId.replace("_", " ").toUpperCase()}</label>
+      <div class="host-badge-editor">
+        <span class="host-label">Host:</span>
+        <span class="host-name">${escapeHtml(host?.name || hostId || "")}</span>
+      </div>
+    </div>
+    <textarea id="${tableId}" data-table-id="${tableId}" placeholder="Discussion question...">${escapeHtml(table.question)}</textarea>
+
+    <div class="speaker-select-section">
+      <div class="assignment-meta">
+        <span>Select speaking agents</span>
+        <span data-selected-count="${tableId}">${speakers.size} selected</span>
+      </div>
+      <div class="agent-select agent-choice-list" data-agent-select="${tableId}">
+        ${agentChoices}
+      </div>
+    </div>
+  `;
+
+  const choiceList = field.querySelector("[data-agent-select]");
+  choiceList.addEventListener("click", (event) => {
+    const choice = event.target.closest("[data-agent-choice]");
+    if (!choice) return;
+    const agentId = choice.dataset.agentChoice;
+    const selectedIds = new Set(speakerAssignments[tableId] || []);
+    if (selectedIds.has(agentId)) {
+      selectedIds.delete(agentId);
+    } else {
+      selectedIds.add(agentId);
+    }
+    speakerAssignments[tableId] = [...selectedIds];
+    choiceList.querySelectorAll("[data-agent-choice]").forEach((item) => {
+      const selected = selectedIds.has(item.dataset.agentChoice);
+      item.classList.toggle("selected", selected);
+      item.setAttribute("aria-pressed", selected ? "true" : "false");
+    });
+    field.querySelector(`[data-selected-count="${tableId}"]`).textContent =
+      `${speakerAssignments[tableId].length} selected`;
+    refreshAgentPromptBoxes(tableId);
+  });
+
+  return field;
+}
+
+function readSpeakerAssignments() {
   return speakerAssignments;
 }
 
@@ -905,7 +981,7 @@ function appendHostOpening(metadata) {
   slot.innerHTML = renderAgentMessage({
     className: "host-opening",
     agentId: metadata.host_id,
-    agentName: metadata.host_name || metadata.host_id,
+    agentName: tableHostLabel(metadata.table_id),
     roleLabel: "桌长开场",
     metaLabel: formatRoundStatusMeta(metadata),
     content: metadata.content || "",
@@ -976,7 +1052,7 @@ function appendHostRecord(metadata) {
     ${renderAgentMessage({
       className: "host-record",
       agentId: metadata.host_id,
-      agentName: metadata.host_name || metadata.host_id,
+      agentName: tableHostLabel(metadata.table_id),
       roleLabel: "桌长记录",
       metaLabel: formatRoundStatusMeta(metadata),
       content: metadata.content || "",
@@ -989,6 +1065,12 @@ function appendHostRecord(metadata) {
   // Highlight host seat on map
   const agents = currentTableAgents[metadata.table_id] || [metadata.host_id];
   drawSeatingChart(null, metadata.table_id, agents, metadata.host_id);
+}
+
+function tableHostLabel(tableId) {
+  const match = String(tableId || "").match(/(\d+)$/);
+  const number = match ? String(Number(match[1])) : String(tableId || "?");
+  return `tb${number}`;
 }
 
 function renderAgentMessage({
@@ -1024,10 +1106,7 @@ function renderAgentMessage({
 }
 
 function renderMemoryTooltip(agentName, snapshot) {
-  const rows = formatMemorySnapshot(snapshot);
-  const body = rows.length
-    ? rows.map((row) => `<p>${renderInlineMarkdown(escapeHtml(row))}</p>`).join("")
-    : "<p>暂无内在记忆记录。</p>";
+  const body = renderMemoryTooltipBody(snapshot);
   return `
     <span class="memory-card" role="tooltip">
       <strong>${escapeHtml(agentName)} · 内在记忆</strong>
@@ -1036,22 +1115,75 @@ function renderMemoryTooltip(agentName, snapshot) {
   `;
 }
 
+function renderMemoryTooltipBody(snapshot) {
+  if (!snapshot || typeof snapshot !== "object") {
+    return "<p>暂无内在记忆记录。</p>";
+  }
+  if (snapshot.kind === "table_host") {
+    return renderHostMemoryTooltip(snapshot);
+  }
+  const rows = formatMemorySnapshot(snapshot);
+  return rows.length
+    ? rows.map((row) => `<p>${renderInlineMarkdown(escapeHtml(row))}</p>`).join("")
+    : "<p>暂无内在记忆记录。</p>";
+}
+
+function renderHostMemoryTooltip(snapshot) {
+  const usage = snapshot.tablememory_usage_description
+    ? `<p class="memory-usage">${escapeHtml(snapshot.tablememory_usage_description)}</p>`
+    : "";
+  const summary = `<p>当前桌面记忆：${escapeHtml(snapshot.living_summary || "暂无")}</p>`;
+  const rounds = (snapshot.recent_rounds || [])
+    .filter((round) => round && typeof round === "object")
+    .map(renderMemoryRound)
+    .join("");
+  const fallbackRound = rounds || renderMemoryRound({
+    round: snapshot.formatmemory?.round_index || "?",
+    synthesis: snapshot.round_pattern_delta || "",
+    repeated_themes: snapshot.formatmemory?.repeated_themes || snapshot.stable_patterns || [],
+    minority_inspiring_views: snapshot.formatmemory?.minority_inspiring_views || snapshot.incomplete_or_weak_patterns || [],
+    unresolved_tensions: snapshot.formatmemory?.unresolved_tensions || snapshot.tensions || [],
+  });
+  return `${usage}${summary}${fallbackRound}${renderMemoryList("下一轮问题种子", snapshot.next_round_question_seeds)}`;
+}
+
+function renderMemoryRound(round) {
+  return `
+    <section class="memory-round">
+      <h4>Round ${escapeHtml(round.round || "?")}</h4>
+      ${round.synthesis ? `<p class="memory-round-summary">${escapeHtml(round.synthesis)}</p>` : ""}
+      ${renderMemoryList("重复主题", round.repeated_themes)}
+      ${renderMemoryList("少数启发", round.minority_inspiring_views)}
+      ${renderMemoryList("未解张力", round.unresolved_tensions)}
+    </section>
+  `;
+}
+
+function renderMemoryList(label, value) {
+  if (!Array.isArray(value) || !value.length) return "";
+  const items = value
+    .filter((item) => item !== null && item !== undefined && String(item).trim())
+    .map((item) => `<li>${escapeHtml(item)}</li>`)
+    .join("");
+  if (!items) return "";
+  return `<div class="memory-list"><span>${escapeHtml(label)}</span><ul>${items}</ul></div>`;
+}
+
 function renderSeatMemoryCard(agentName, roleTag, snapshot) {
   const rows = formatMemorySnapshot(snapshot);
   const sections = [];
   if (snapshot && snapshot.kind === "table_host") {
+    if (snapshot.tablememory_usage_description) {
+      sections.push(`<div class="smc-section smc-usage"><div class="smc-section-body">${escapeHtml(snapshot.tablememory_usage_description)}</div></div>`);
+    }
     if (snapshot.living_summary) {
       sections.push(`<div class="smc-section"><div class="smc-section-title">📝 桌面记忆</div><div class="smc-section-body">${escapeHtml(snapshot.living_summary)}</div></div>`);
     }
-    if (Array.isArray(snapshot.key_insights) && snapshot.key_insights.length) {
-      sections.push(`<div class="smc-section"><div class="smc-section-title">💡 保留洞察</div><ul class="smc-list">${snapshot.key_insights.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul></div>`);
-    }
-    if (Array.isArray(snapshot.open_questions) && snapshot.open_questions.length) {
-      sections.push(`<div class="smc-section"><div class="smc-section-title">❓ 开放问题</div><ul class="smc-list">${snapshot.open_questions.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul></div>`);
-    }
-    if (Array.isArray(snapshot.tensions) && snapshot.tensions.length) {
-      sections.push(`<div class="smc-section"><div class="smc-section-title">⚡ 张力</div><ul class="smc-list">${snapshot.tensions.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul></div>`);
-    }
+    const rounds = (snapshot.recent_rounds || [])
+      .filter((round) => round && typeof round === "object")
+      .map(renderSeatMemoryRound)
+      .join("");
+    if (rounds) sections.push(rounds);
     if (Array.isArray(snapshot.next_round_question_seeds) && snapshot.next_round_question_seeds.length) {
       sections.push(`<div class="smc-section"><div class="smc-section-title">🌱 下一轮问题种子</div><ul class="smc-list">${snapshot.next_round_question_seeds.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul></div>`);
     }
@@ -1079,6 +1211,28 @@ function renderSeatMemoryCard(agentName, roleTag, snapshot) {
     </div>
     <div class="smc-body">${body}</div>
   `;
+}
+
+function renderSeatMemoryRound(round) {
+  return `
+    <div class="smc-section smc-round">
+      <div class="smc-section-title">Round ${escapeHtml(round.round || "?")}</div>
+      ${round.synthesis ? `<div class="smc-section-body">${escapeHtml(round.synthesis)}</div>` : ""}
+      ${renderSeatMemoryList("重复主题", round.repeated_themes)}
+      ${renderSeatMemoryList("少数启发", round.minority_inspiring_views)}
+      ${renderSeatMemoryList("未解张力", round.unresolved_tensions)}
+    </div>
+  `;
+}
+
+function renderSeatMemoryList(label, value) {
+  if (!Array.isArray(value) || !value.length) return "";
+  const items = value
+    .filter((item) => item !== null && item !== undefined && String(item).trim())
+    .map((item) => `<li>${escapeHtml(item)}</li>`)
+    .join("");
+  if (!items) return "";
+  return `<div class="smc-sublist"><span>${escapeHtml(label)}</span><ul class="smc-list">${items}</ul></div>`;
 }
 
 // Dismiss seat memory popovers when clicking outside
@@ -1294,7 +1448,7 @@ function getSpeakersPerTable() {
 }
 
 function getRoundCount() {
-  return clampNumber(roundsInput.value, 1, 6, 3);
+  return getTableCount();
 }
 
 function getSpeechesPerAgent() {
@@ -1537,6 +1691,13 @@ function addSelectedNote() {
   const { text, speech, range } = selectionInfo;
   const noteId = `note-${++noteSequence}`;
   const highlighted = highlightSelectionRange(range, noteId);
+  const roundBlock = speech.closest("[data-round-index]");
+  const tableCard = speech.closest("[data-table-id]");
+  const tableId = speech.dataset.tableId || tableCard?.dataset.tableId || activeNoteCheckpoint?.table_id || "";
+  const roundIndexValue = speech.dataset.roundIndex || roundBlock?.dataset.roundIndex;
+  const roundIndex = Number.isFinite(Number(roundIndexValue))
+    ? Number(roundIndexValue)
+    : Number(activeNoteCheckpoint?.round_index);
   notebookEntries = [
     ...notebookEntries,
     {
@@ -1544,17 +1705,18 @@ function addSelectedNote() {
       text,
       speakerName: speech.dataset.speakerName || "Unknown speaker",
       speakerId: speech.dataset.speakerId || "",
-      tableId: speech.dataset.tableId || "",
-      roundIndex: Number(speech.dataset.roundIndex),
+      tableId,
+      roundIndex,
       speechId: speech.id,
       speechTargetId: highlighted?.id || speech.id,
-      round: Number(speech.dataset.roundIndex) + 1 || currentRound,
+      round: Number.isFinite(roundIndex) ? roundIndex + 1 : currentRound,
       createdAt: new Date().toLocaleTimeString(),
     },
   ];
   window.getSelection()?.removeAllRanges();
   pendingNoteSelection = null;
   renderNotebook();
+  refreshNoteTakingControls();
   addNoteBtn.disabled = true;
 }
 

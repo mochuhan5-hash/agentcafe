@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from typing import Any, Literal
 
-from world_cafe.state import CarryOverPacket, TableMemory, TableSpec, UserNote
+from world_cafe.state import TABLEMEMORY_USAGE_DESCRIPTION, CarryOverPacket, TableMemory, TableSpec, UserNote
 
 
 MemoryView = Literal[
@@ -118,6 +118,7 @@ def format_closing_context(memory_update: dict[str, Any]) -> str:
 
 def _format_speaker_memory(memory: TableMemory) -> str:
     lines = [
+        _line("tablememory 使用说明", _tablememory_usage_description(memory)),
         _line("桌子问题", memory.get("question")),
         _line("活记忆摘要", memory.get("living_summary")),
         _block("最近 formatmemory", _formatmemory_digest(memory, limit=2, compact=True), limit=2),
@@ -128,6 +129,7 @@ def _format_speaker_memory(memory: TableMemory) -> str:
 
 def _format_host_opening_memory(memory: TableMemory) -> str:
     lines = [
+        _line("tablememory 使用说明", _tablememory_usage_description(memory)),
         _line("桌子问题", memory.get("question")),
         _line("活记忆摘要", memory.get("living_summary")),
         _block("已记录 formatmemory", _formatmemory_digest(memory, limit=3), limit=3),
@@ -138,6 +140,7 @@ def _format_host_opening_memory(memory: TableMemory) -> str:
 
 def _format_host_synthesis_memory(memory: TableMemory) -> str:
     lines = [
+        _line("tablememory 使用说明", _tablememory_usage_description(memory)),
         _line("桌子问题", memory.get("question")),
         _line("活记忆摘要", memory.get("living_summary")),
         _block("已完成轮次 formatmemory", _formatmemory_digest(memory, limit=4), limit=4),
@@ -148,6 +151,7 @@ def _format_host_synthesis_memory(memory: TableMemory) -> str:
 
 def _format_host_closing_memory(memory: TableMemory) -> str:
     lines = [
+        _line("tablememory 使用说明", _tablememory_usage_description(memory)),
         _line("桌子问题", memory.get("question")),
         _line("活记忆摘要", memory.get("living_summary")),
         _block("最近 formatmemory", _formatmemory_digest(memory, limit=1), limit=1),
@@ -158,6 +162,7 @@ def _format_host_closing_memory(memory: TableMemory) -> str:
 
 def _format_packet_source_memory(memory: TableMemory) -> str:
     lines = [
+        _line("tablememory 使用说明", _tablememory_usage_description(memory)),
         _line("来源桌问题", memory.get("question")),
         _line("来源桌活记忆摘要", memory.get("living_summary")),
         _block("来源桌最近 formatmemory", _formatmemory_digest(memory, limit=1), limit=1),
@@ -167,6 +172,7 @@ def _format_packet_source_memory(memory: TableMemory) -> str:
 
 def _format_harvest_memory(memory: TableMemory) -> str:
     lines = [
+        _line("tablememory 使用说明", _tablememory_usage_description(memory)),
         _line("桌子问题", memory.get("question")),
         _line("活记忆摘要", memory.get("living_summary")),
         _block("formatmemory", _formatmemory_digest(memory, limit=4), limit=4),
@@ -177,12 +183,17 @@ def _format_harvest_memory(memory: TableMemory) -> str:
 
 def _format_full_memory(memory: TableMemory) -> str:
     lines = [
+        _line("tablememory 使用说明", _tablememory_usage_description(memory)),
         _line("桌子问题", memory.get("question")),
         _line("活记忆摘要", memory.get("living_summary")),
         _block("formatmemory", _formatmemory_digest(memory, limit=6), limit=6),
         _block("下一轮问题种子", memory.get("next_round_question_seeds"), limit=8),
     ]
     return _join(lines)
+
+
+def _tablememory_usage_description(memory: TableMemory) -> str:
+    return str(memory.get("tablememory_usage_description") or TABLEMEMORY_USAGE_DESCRIPTION)
 
 
 def _formatmemory_digest(memory: TableMemory, *, limit: int, compact: bool = False) -> list[str]:
@@ -266,18 +277,15 @@ def _has_formatmemory_content(record: dict[str, Any]) -> bool:
 
 def _bridge_intent_from_memory(agent_memory: object) -> str:
     if isinstance(agent_memory, dict):
-        question = str(agent_memory.get("carry_forward_question") or "").strip()
         insight = str(
             agent_memory.get("personal_insight")
             or agent_memory.get("personal_takeaway")
             or ""
         ).strip()
-        if question:
-            return f"带到下一桌测试：{question}"
         if insight:
-            return f"带到下一桌测试这条个人洞察：{insight[:80]}"
+            return f"带到下一桌这条个人洞察：{insight[:80]}"
     if isinstance(agent_memory, str) and agent_memory.strip():
-        return f"带到下一桌测试这条个人洞察：{agent_memory.strip()[:80]}"
+        return f"带到下一桌这条个人洞察：{agent_memory.strip()[:80]}"
     return ""
 
 

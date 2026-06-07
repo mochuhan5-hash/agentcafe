@@ -4,6 +4,12 @@ import operator
 from typing import Annotated, Any, Literal, TypedDict
 
 
+TABLEMEMORY_USAGE_DESCRIPTION = (
+    "既有 formatmemory 是本桌过去轮次的累计记忆，只用于识别延续、变化和重复。"
+    "本轮输出的 formatmemory 只能新增 round_index = 当前轮次 的一条记录，不要改写过去轮次。"
+)
+
+
 Stage = Literal[
     "setup",
     "round_started",
@@ -88,6 +94,7 @@ class TableMemory(TypedDict, total=False):
     unresolved_tensions_over_time: list[str]
     round_pattern_delta: str
     next_round_question_seeds: list[str]
+    tablememory_usage_description: str
 
 
 class TableRoundOutput(TypedDict):

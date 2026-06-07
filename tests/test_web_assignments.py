@@ -104,8 +104,9 @@ def test_static_app_exposes_speech_count_pause_and_notebook_controls() -> None:
     assert "/note-checkpoint/continue" in js
     assert 'action: "switch_table"' in js
     assert "换桌" in js
-    assert "tableId: speech.dataset.tableId" in js
-    assert "roundIndex: Number(speech.dataset.roundIndex)" in js
+    assert "table_id: entry.tableId" in js
+    assert "round_index: Number(entry.roundIndex)" in js
+    assert "const tableId = speech.dataset.tableId" in js
     assert "extractContents" in js
     assert "speakerName" in js
     assert 'id="noteCheckpointPanel"' in html
@@ -121,6 +122,13 @@ def test_static_app_exposes_speech_count_pause_and_notebook_controls() -> None:
     assert "overscroll-behavior: contain" in css
     assert "scrollbar-gutter: stable" in css
     assert "scrollTableToBottom" in js
+    assert "renderHostMemoryTooltip" in js
+    assert "renderMemoryRound" in js
+    assert "重复主题" in js
+    assert "少数启发" in js
+    assert "未解张力" in js
+    assert ".memory-round" in css
+    assert ".memory-list" in css
 
 
 @pytest.mark.asyncio

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
 import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any, Literal
@@ -24,6 +25,7 @@ from world_cafe.prompts import (
 )
 from world_cafe.rotation import build_initial_assignments, rotate_non_hosts
 from world_cafe.state import (
+    TABLEMEMORY_USAGE_DESCRIPTION,
     AgentProfile,
     CarryOverPacket,
     TableMemory,
@@ -398,7 +400,6 @@ def _make_table_discussion_node(llm: CafeLLM, pause_check: PauseCheck, note_chec
             memory_update=table_memory_update,
             fallback_memory=memory,
             next_table_by_agent=task.get("next_table_by_agent", {}),
-            all_table_questions=task.get("all_table_questions", {}),
         )
         output: TableRoundOutput = {
             "table_id": table_id,
@@ -503,6 +504,11 @@ def _collect_round(state: WorldCafeState) -> dict[str, Any]:
         )
         memory["round_pattern_delta"] = str(memory_update.get("round_pattern_delta") or "")
         memory["next_round_question_seeds"] = _string_list(memory_update.get("next_round_question_seeds"))
+        memory["tablememory_usage_description"] = str(
+            memory_update.get("tablememory_usage_description")
+            or memory.get("tablememory_usage_description")
+            or TABLEMEMORY_USAGE_DESCRIPTION
+        )
         memory["formatmemory"] = [
             *_formatmemory_list(memory.get("formatmemory")),
             formatmemory_record,
@@ -612,7 +618,7 @@ def _make_global_harvest_node(llm: CafeLLM):
     async def global_harvest(state: WorldCafeState) -> dict[str, Any]:
         start_event = make_event("harvest", "global harvest started", round_count=state["max_rounds"])
         emit_stream_event(start_event)
-        system, user = global_harvest_prompt(state["table_memories"], state["round_summaries"])
+        system, user = global_harvest_prompt(state["table_memories"], state["table_round_outputs"])
         content = await llm.agenerate(system, user)
         structured_harvest = _parse_structured_harvest(content)
         harvest = {
@@ -620,7 +626,7 @@ def _make_global_harvest_node(llm: CafeLLM):
             "raw_content": content,
             "structured_harvest": structured_harvest,
             "table_memories": state["table_memories"],
-            "round_summaries": state["round_summaries"],
+            "speaking_agent_history": state["table_round_outputs"],
             "rotation_history": state["rotation_history"],
         }
         done_event = make_event("done", "world cafe completed", run_id=state["run_id"])
@@ -638,60 +644,207 @@ def _parse_structured_harvest(content: str) -> dict[str, Any]:
     try:
         data = loads_jsonish_object(content)
     except Exception:
+        pattern_channel = _extract_legacy_harvest_items(content, "Shared Patterns")
+        weak_signal_channel = _extract_legacy_harvest_items(content, "Weak Signals")
+        cross_table_tensions = _extract_legacy_harvest_items(content, "Cross-table Tensions")
+        reframed_questions = _extract_legacy_harvest_items(content, "Reframed Questions")
+        next_experiments = _extract_legacy_harvest_items(content, "Next Experiments")
         return {
-            "pattern_channel": extract_bullets(extract_section(content, "Shared Patterns")),
-            "weak_signal_channel": extract_bullets(extract_section(content, "Weak Signals")),
-            "cross_table_tensions": extract_bullets(extract_section(content, "Cross-table Tensions")),
+            "user_needs": _extract_design_insight_items(content, "1、用户主要需求的提取")
+            or pattern_channel
+            or weak_signal_channel,
+            "reframed_design_problem": _extract_design_insight_text(content, "2、设计问题的重新界定")
+            or _first_text(reframed_questions, cross_table_tensions),
+            "next_design_directions": _limit_items(
+                _extract_design_insight_items(content, "3、不超过三个后续的设计方向")
+                or _extract_design_insight_items(content, "3、后续的设计方向")
+                or next_experiments,
+                3,
+            ),
+            "pattern_channel": pattern_channel,
+            "weak_signal_channel": weak_signal_channel,
+            "cross_table_tensions": cross_table_tensions,
             "opportunity_hypotheses": [],
-            "reframed_design_questions": extract_bullets(extract_section(content, "Reframed Questions")),
-            "next_learning_experiments": extract_bullets(extract_section(content, "Next Experiments")),
+            "reframed_design_questions": reframed_questions,
+            "next_learning_experiments": next_experiments,
         }
+    display = str(data.get("display_markdown") or data.get("markdown") or "")
+    pattern_channel = data.get("pattern_channel") or data.get("shared_patterns") or data.get("cross_table_patterns") or []
+    weak_signal_channel = data.get("weak_signal_channel") or data.get("weak_signals") or data.get("rare_but_promising_signals") or []
+    cross_table_tensions = data.get("cross_table_tensions") or data.get("tensions") or data.get("unresolved_system_tensions") or []
+    reframed_questions = data.get("reframed_design_questions") or data.get("reframed_questions") or []
+    next_experiments = data.get("next_learning_experiments") or data.get("next_experiments") or []
+    pattern_items = _coerce_items(pattern_channel) or _extract_legacy_harvest_items(display, "Shared Patterns")
+    weak_signal_items = _coerce_items(weak_signal_channel) or _extract_legacy_harvest_items(display, "Weak Signals")
+    tension_items = _coerce_items(cross_table_tensions) or _extract_legacy_harvest_items(display, "Cross-table Tensions")
+    reframed_question_items = _coerce_items(reframed_questions) or _extract_legacy_harvest_items(display, "Reframed Questions")
+    next_experiment_items = _coerce_items(next_experiments) or _extract_legacy_harvest_items(display, "Next Experiments")
     return {
-        "pattern_channel": data.get("pattern_channel") or data.get("shared_patterns") or data.get("cross_table_patterns") or [],
-        "weak_signal_channel": data.get("weak_signal_channel") or data.get("weak_signals") or data.get("rare_but_promising_signals") or [],
-        "cross_table_tensions": data.get("cross_table_tensions") or data.get("tensions") or data.get("unresolved_system_tensions") or [],
+        "user_needs": _coerce_items(
+            data.get("user_needs")
+            or data.get("primary_user_needs")
+            or data.get("main_user_needs")
+            or data.get("用户主要需求的提取")
+        )
+        or pattern_items
+        or weak_signal_items,
+        "reframed_design_problem": _coerce_text(
+            data.get("reframed_design_problem")
+            or data.get("design_problem_reframe")
+            or data.get("设计问题的重新界定")
+        )
+        or _first_text(reframed_question_items, tension_items),
+        "next_design_directions": _limit_items(
+            _coerce_items(
+                data.get("next_design_directions")
+                or data.get("design_directions")
+                or data.get("后续的设计方向")
+            )
+            or next_experiment_items,
+            3,
+        ),
+        "pattern_channel": pattern_channel or pattern_items,
+        "weak_signal_channel": weak_signal_channel or weak_signal_items,
+        "cross_table_tensions": cross_table_tensions or tension_items,
         "opportunity_hypotheses": data.get("opportunity_hypotheses") or data.get("opportunities") or [],
-        "reframed_design_questions": data.get("reframed_design_questions") or data.get("reframed_questions") or [],
-        "next_learning_experiments": data.get("next_learning_experiments") or data.get("next_experiments") or [],
-        "display_markdown": str(data.get("display_markdown") or data.get("markdown") or ""),
+        "reframed_design_questions": reframed_questions or reframed_question_items,
+        "next_learning_experiments": next_experiments or next_experiment_items,
+        "display_markdown": display,
     }
 
 
 def _harvest_display_content(content: str, structured_harvest: dict[str, Any]) -> str:
     display = str(structured_harvest.get("display_markdown") or "").strip()
-    if display:
-        return emphasize_design_opportunities(display)
+    if display and _is_design_insight_markdown(display):
+        return emphasize_design_opportunities(_limit_harvest_display(display))
     try:
         loads_jsonish_object(content)
     except Exception:
-        return emphasize_design_opportunities(content)
-    if not _has_harvest_content(structured_harvest):
-        return emphasize_design_opportunities(content)
-    return emphasize_design_opportunities(_format_structured_harvest_markdown(structured_harvest))
-
-
-def _has_harvest_content(harvest: dict[str, Any]) -> bool:
-    keys = (
-        "pattern_channel",
-        "weak_signal_channel",
-        "cross_table_tensions",
-        "opportunity_hypotheses",
-        "reframed_design_questions",
-        "next_learning_experiments",
-    )
-    return any(bool(harvest.get(key)) for key in keys)
+        if _is_design_insight_markdown(content):
+            return emphasize_design_opportunities(_limit_harvest_display(content))
+        return emphasize_design_opportunities(_limit_harvest_display(_format_structured_harvest_markdown(structured_harvest)))
+    return emphasize_design_opportunities(_limit_harvest_display(_format_structured_harvest_markdown(structured_harvest)))
 
 
 def _format_structured_harvest_markdown(harvest: dict[str, Any]) -> str:
-    return "\n\n".join(
+    direction_items = _limit_items(_coerce_items(harvest.get("next_design_directions")), 3)
+    direction_lines = [f"- {item}" for item in direction_items] or ["- 暂无"]
+    return "\n".join(
         [
-            "## Shared Patterns\n" + _markdown_items(harvest.get("pattern_channel")),
-            "## Weak Signals\n" + _markdown_items(harvest.get("weak_signal_channel")),
-            "## Cross-table Tensions\n" + _markdown_items(harvest.get("cross_table_tensions")),
-            "## Reframed Questions\n" + _markdown_items(harvest.get("reframed_design_questions")),
-            "## Next Experiments\n" + _markdown_items(harvest.get("next_learning_experiments")),
+            "设计洞察：",
+            f"1、用户主要需求的提取：{_inline_items(harvest.get('user_needs'))}",
+            f"2、设计问题的重新界定：{_coerce_text(harvest.get('reframed_design_problem')) or '暂无'}",
+            "3、不超过三个后续的设计方向：",
+            *direction_lines,
         ]
     )
+
+
+def _is_design_insight_markdown(text: str) -> bool:
+    return all(marker in text for marker in ("设计洞察", "用户主要需求", "设计问题", "设计方向"))
+
+
+def _extract_legacy_harvest_items(content: str, heading: str) -> list[str]:
+    section = extract_section(content, heading) or _extract_plain_heading_section(content, heading)
+    bullets = extract_bullets(section)
+    if bullets:
+        return _without_empty_placeholders(bullets)
+    lines: list[str] = []
+    for line in section.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if stripped.startswith(("- ", "* ")):
+            stripped = stripped[2:].strip()
+        lines.append(stripped)
+    return _without_empty_placeholders(lines)
+
+
+def _extract_plain_heading_section(content: str, heading: str) -> str:
+    legacy_headings = (
+        "Shared Patterns",
+        "Weak Signals",
+        "Cross-table Tensions",
+        "Reframed Questions",
+        "Next Experiments",
+    )
+    lines = content.splitlines()
+    start: int | None = None
+    end = len(lines)
+    target = heading.lower()
+    heading_names = {item.lower() for item in legacy_headings}
+    for index, line in enumerate(lines):
+        stripped = line.strip().strip("#").strip().rstrip(":：").lower()
+        if stripped == target:
+            start = index + 1
+            continue
+        if start is not None and stripped in heading_names:
+            end = index
+            break
+    if start is None:
+        return ""
+    return "\n".join(lines[start:end]).strip()
+
+
+def _without_empty_placeholders(items: list[str]) -> list[str]:
+    placeholders = {"暂无", "无", "none", "n/a", "na", "null", "-"}
+    return [item for item in (str(item).strip() for item in items) if item and item.lower() not in placeholders]
+
+
+def _extract_design_insight_text(content: str, label: str) -> str:
+    pattern = re.compile(rf"{re.escape(label)}\s*[:：]?\s*(.*?)(?=\n\s*[123]、|\Z)", re.DOTALL)
+    match = pattern.search(content)
+    if not match:
+        return ""
+    lines = [line.strip() for line in match.group(1).splitlines() if line.strip()]
+    lines = [line[2:].strip() if line.startswith(("- ", "* ")) else line for line in lines]
+    return "；".join(lines).strip()
+
+
+def _extract_design_insight_items(content: str, label: str) -> list[str]:
+    text = _extract_design_insight_text(content, label)
+    if not text:
+        return []
+    return [item.strip() for item in re.split(r"[；;]\s*", text) if item.strip()]
+
+
+def _coerce_items(value: object) -> list[str]:
+    if value in ("", None, [], {}):
+        return []
+    values = value if isinstance(value, list) else [value]
+    return [item for item in (_coerce_text(value) for value in values) if item]
+
+
+def _coerce_text(value: object) -> str:
+    if value in ("", None, [], {}):
+        return ""
+    if isinstance(value, list):
+        return "；".join(_coerce_items(value))
+    return _compact_item(value).strip()
+
+
+def _inline_items(value: object) -> str:
+    items = _coerce_items(value)
+    return "；".join(items) if items else "暂无"
+
+
+def _limit_items(items: list[str], limit: int) -> list[str]:
+    return [item for item in items if item][:limit]
+
+
+def _first_text(*values: object) -> str:
+    for value in values:
+        text = _coerce_text(value)
+        if text:
+            return text
+    return ""
+
+
+def _limit_harvest_display(text: str, limit: int = 500) -> str:
+    display = text.strip()
+    if len(display) <= limit:
+        return display
+    return display[: limit - 3].rstrip() + "..."
 
 
 def _markdown_items(value: object) -> str:
@@ -759,12 +912,40 @@ def _host_memory_snapshot(memory: TableMemory, update: dict[str, Any] | None = N
                 "unresolved_tensions": _string_list(record.get("unresolved_tensions"))[:3],
             }
         )
+    if update:
+        current_round = current.get("round_index")
+        if current_round is not None:
+            try:
+                current_round_number = int(current_round)
+            except (TypeError, ValueError):
+                current_round_number = len(rounds) + 1
+        else:
+            current_round_number = len(rounds) + 1
+        recent_rounds = [
+            item for item in recent_rounds
+            if int(item.get("round", 0) or 0) != current_round_number
+        ]
+        recent_rounds.append(
+            {
+                "round": current_round_number,
+                "synthesis": _limit_visible_text(_formatmemory_summary(current), 160),
+                "repeated_themes": _string_list(current.get("repeated_themes"))[:3],
+                "minority_inspiring_views": _string_list(current.get("minority_inspiring_views"))[:3],
+                "unresolved_tensions": _string_list(current.get("unresolved_tensions"))[:3],
+            }
+        )
+        recent_rounds = recent_rounds[-4:]
     key_insights = unique_append(
         _string_list(current.get("repeated_themes")),
         _string_list(current.get("minority_inspiring_views")),
     )
     return {
         "kind": "table_host",
+        "tablememory_usage_description": str(
+            update.get("tablememory_usage_description")
+            or memory.get("tablememory_usage_description")
+            or TABLEMEMORY_USAGE_DESCRIPTION
+        ),
         "living_summary": _limit_visible_text(
             str(update.get("synthesis") or _formatmemory_summary(current) or memory.get("living_summary") or "暂无。"),
             180,
@@ -992,6 +1173,7 @@ def _empty_table_memory(table_id: str, question: str, host_id: str) -> TableMemo
         "blind_spots_or_ambiguities": [],
         "formatmemory": [],
         "rounds": [],
+        "tablememory_usage_description": TABLEMEMORY_USAGE_DESCRIPTION,
         "cumulative_pattern_evolution": "",
         "recurring_patterns_across_rounds": [],
         "emerging_or_fading_signals": [],
@@ -1149,8 +1331,14 @@ def _parse_host_memory_update(content: str) -> dict[str, Any]:
             _string_list(record.get("minority_inspiring_views")),
         )
         next_round_question_seeds = _string_list(data.get("next_round_question_seeds") or data.get("open_questions"))
+        tablememory_usage_description = str(
+            data.get("tablememory_usage_description")
+            or data.get("table_memory_usage_description")
+            or TABLEMEMORY_USAGE_DESCRIPTION
+        )
         return {
             "synthesis": synthesis,
+            "tablememory_usage_description": tablememory_usage_description,
             "formatmemory": record,
             "key_insights": key_insights,
             "stable_patterns": _string_list(record.get("repeated_themes")),
@@ -1180,6 +1368,7 @@ def _parse_host_memory_update(content: str) -> dict[str, Any]:
     }
     return {
         "synthesis": _formatmemory_summary(record) or synthesis,
+        "tablememory_usage_description": TABLEMEMORY_USAGE_DESCRIPTION,
         "formatmemory": record,
         "key_insights": key_insights,
         "stable_patterns": key_insights,
@@ -1203,6 +1392,7 @@ def _fallback_host_synthesis(contributions: list[dict[str, Any]], error_message:
     first_snippet = snippets[0][:160] if snippets else "本轮没有可用发言。"
     return json.dumps(
         {
+            "tablememory_usage_description": TABLEMEMORY_USAGE_DESCRIPTION,
             "formatmemory": {
                 "table_question": "",
                 "round_index": None,
@@ -1236,7 +1426,6 @@ def _fallback_agent_packet_content(
             "agent_generated_memory": {
                 "skill_lens": "、".join(agent.get("skills", [])) or agent.get("role", ""),
                 "personal_insight": personal_takeaway[:220],
-                "carry_forward_question": "这个个人洞见在下一桌任务里是否仍然成立？",
             },
             "generation_error": error_message[:160],
         },
@@ -1254,7 +1443,6 @@ async def _generate_carry_over_packets(
     memory_update: dict[str, Any],
     fallback_memory: TableMemory,
     next_table_by_agent: dict[str, str],
-    all_table_questions: dict[str, str],
 ) -> list[CarryOverPacket]:
     if not next_table_by_agent:
         return []
@@ -1264,14 +1452,12 @@ async def _generate_carry_over_packets(
         to_table = next_table_by_agent.get(agent["id"])
         if not to_table:
             continue
-        to_question = all_table_questions.get(to_table) or to_table
         system, user = carry_over_packet_prompt(
             agent=agent,
             from_table=table_id,
             to_table=to_table,
             after_round=round_index,
             from_memory=fallback_memory,
-            to_question=to_question,
             agent_contributions=contributions_by_agent.get(agent["id"], []),
         )
         generation_error: str | None = None
@@ -1311,12 +1497,13 @@ def _parse_packet_response(
         data = {
             "agent_generated_memory": {
                 "personal_insight": content,
-                "carry_forward_question": "这个个人洞见在下一桌任务里是否仍然成立？",
             },
-            "bridge_intent": "把上一桌个人洞见带到下一桌任务中测试。",
         }
     agent = data.get("agent") if isinstance(data.get("agent"), dict) else {}
     agent_memory = data.get("agent_generated_memory") or {}
+    if isinstance(agent_memory, dict):
+        agent_memory = dict(agent_memory)
+        agent_memory.pop("carry_forward_question", None)
     return {
         "agent_id": agent_id,
         "agent": {
@@ -1334,18 +1521,15 @@ def _parse_packet_response(
 
 def _bridge_intent_from_memory(agent_memory: object) -> str:
     if isinstance(agent_memory, dict):
-        question = str(agent_memory.get("carry_forward_question") or "").strip()
         insight = str(
             agent_memory.get("personal_insight")
             or agent_memory.get("personal_takeaway")
             or ""
         ).strip()
-        if question:
-            return f"带着个人洞察进入下一桌，测试：{question}"
         if insight:
-            return f"带着这个个人洞察进入下一桌继续测试：{insight[:80]}"
+            return f"带着这个个人洞察进入下一桌：{insight[:80]}"
     if isinstance(agent_memory, str) and agent_memory.strip():
-        return f"带着这个个人洞察进入下一桌继续测试：{agent_memory.strip()[:80]}"
+        return f"带着这个个人洞察进入下一桌：{agent_memory.strip()[:80]}"
     return ""
 
 

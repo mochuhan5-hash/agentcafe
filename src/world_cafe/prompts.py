@@ -12,7 +12,15 @@ from world_cafe.context import (
     format_user_notes,
     parent_question_from_spec,
 )
-from world_cafe.state import AgentProfile, CarryOverPacket, TableMemory, TableSpec, UserNote
+from world_cafe.state import (
+    TABLEMEMORY_USAGE_DESCRIPTION,
+    AgentProfile,
+    CarryOverPacket,
+    TableMemory,
+    TableRoundOutput,
+    TableSpec,
+    UserNote,
+)
 
 
 def format_agent(profile: AgentProfile) -> str:
@@ -33,6 +41,55 @@ def format_packet(packet: CarryOverPacket | dict[str, Any] | None) -> str:
     return format_carry_over_packet(packet)
 
 
+def format_speaking_agent_history(table_round_outputs: list[TableRoundOutput]) -> str:
+    if not table_round_outputs:
+        return "暂无"
+    sections: list[str] = []
+    outputs = sorted(
+        table_round_outputs,
+        key=lambda output: (output.get("round_index", 0), output.get("table_id", "")),
+    )
+    for output in outputs:
+        header = (
+            f"## Round {int(output.get('round_index', 0)) + 1} · {output.get('table_id', '')}\n"
+            f"桌子问题：{output.get('question', '')}"
+        )
+        lines = [header]
+        contributions = sorted(
+            output.get("contributions", []),
+            key=lambda item: item.get("turn_index", 0),
+        )
+        for contribution in contributions:
+            agent_name = contribution.get("agent_name", "")
+            agent_id = contribution.get("agent_id", "")
+            turn_index = int(contribution.get("turn_index", 0)) + 1
+            cycle_index = int(contribution.get("cycle_index", 0)) + 1
+            content = str(contribution.get("content") or "").strip()
+            lines.append(f"- 发言{turn_index} / cycle {cycle_index} · {agent_name} ({agent_id})：{content}")
+        sections.append("\n".join(lines))
+    return "\n\n".join(sections)
+
+
+def format_user_note_history(table_round_outputs: list[TableRoundOutput]) -> str:
+    if not table_round_outputs:
+        return "暂无"
+    sections: list[str] = []
+    outputs = sorted(
+        table_round_outputs,
+        key=lambda output: (output.get("round_index", 0), output.get("table_id", "")),
+    )
+    for output in outputs:
+        notes = output.get("user_notes") or []
+        if not notes:
+            continue
+        header = (
+            f"## Round {int(output.get('round_index', 0)) + 1} · {output.get('table_id', '')}\n"
+            f"桌子问题：{output.get('question', '')}"
+        )
+        sections.append(f"{header}\n{format_user_notes(notes)}")
+    return "\n\n".join(sections) or "暂无"
+
+
 def contribution_prompt(
     *,
     table_id: str,
@@ -49,8 +106,9 @@ def contribution_prompt(
     cycle_index: int,
 ) -> tuple[str, str]:
     system = (
-        "你是 World Cafe 轮换参与者。你的可见发言应当像真实小桌对话中的自然接话，不是结构化报告。"
-        "table_spec、background_context、table_memory 和 carry_over_packet 只作为你的内在记忆和上下文参考，不能机械复述，也不要暴露 JSON、字段名、模板名或 pocket 结构。"
+        "你是 World Cafe 轮换参与者，与多位参与者讨论设计问题和洞察，你不要列举background_context里用户访谈的例子，清晰重述自己的经验、观点即可。你的可见发言应当像真实小桌对话中的自然接话，不是结构化报告。"
+        "每次发言字数严格控制在100字以内，不需要列举背景材料的例子。"
+        "table_spec、background_context（仅作参考，不要引用用户访谈具体内容,可以结合自己的经历）、table_memory 和 carry_over_packet （作为你的内在记忆和自我认知对你发言内容和观点的影响很大），不能机械复述，也不要暴露 JSON、字段名、模板名或 pocket 结构。"
         "用户原始大问题和背景材料是上位任务边界，本桌问题是当前小桌切入点；不要只围绕小桌问题而忘记上位任务。"
         "你要综合所有上下文形成判断，但发言时优先回应当前对话，尤其接住上一位参与者刚刚说的话，再自然补充、追问或提出不同观察。"
         "不要重新概括 table question，也不要重复已经稳定的共识；如果讨论开始回到上一轮已经说清楚的内容，请转向差异、盲点、边缘案例、具体证据或可检验追问。"
@@ -74,14 +132,15 @@ def contribution_prompt(
         f"背景材料：\n{format_background(background_context)}\n\n"
         f"你的画像：\n{format_agent(agent)}\n\n"
         f"本桌成员：\n{peers}\n\n"
-        f"桌长记忆：\n{format_memory(memory, view='speaker')}\n\n"
-        f"你的 carry_over_packet（agent-level migrant memory）：\n{format_packet(carry_over_packet)}\n\n"
+        f"桌长记忆（可以回顾上一轮对此问题的讨论）：\n{format_memory(memory, view='speaker')}\n\n"
+        f"你的 carry_over_packet（agent-level migrant memory，你上一轮 takeaway 的个人洞察，优先级高发言时必结合反思，作为概论发言的独特认知）：\n{format_packet(carry_over_packet)}\n\n"
         f"本轮到目前为止的对话：\n{transcript}\n\n"
-        "现在轮到你发言。请像真实小桌参与者一样结合table_spec、background_context、table_memory 和 carry_over_packet(包含你从上一轮讨论产生的个人洞察) 自然回应，不要按字段、来源或小标题输出。"
+        "现在轮到你发言。请像真实小桌参与者一样结合table_spec、background_context（不需要列举背景材料中的例子）、table_memory（可以回顾上一轮对此问题的讨论，你可以发散、评价、延展、反对等） 和 carry_over_packet(你上一轮takeaway的个人洞察，可以作为概论发言的独特认知) 自然回应，不要按字段、来源或小标题输出。"
         "如果前面已经有人发言，先回应最近一位发言者的意思，再把你的观察自然接进去；"
         "如果当前讨论已经重复上一轮的稳定 pattern，请不要再阐述同一观点，而是带入一个不同用户/场景/机制盲点/反例/追问。"
         "如果你使用了 carry_over_packet 或 table_memory，只让它影响你的判断，不要说明你正在使用它。"
-        "请控制在200字以内。"
+        "每次发言请仔细回顾本桌问题（大问题优先或小问题），不要跑题"
+        "每次发言字数严格控制在100字以内。"
     )
     return system, user
 
@@ -103,15 +162,20 @@ def host_opening_prompt(
         f"本桌问题：{question}\n\n"
         f"既有 table_memory（按开场问题裁剪）：\n{format_memory(memory, view='host_opening')}\n\n"
         f"background_context：\n{format_background(background_context)}\n\n"
-        "请输出简短 Markdown，系统会只把 opening 展示给用户，question_seeds 只用于流程引导：\n"
+        "请输出简短 Markdown，系统会只把 opening 展示给用户：\n"
         "## opening\n"
-        "提出2-3个可直接开启讨论的简短开放问句，每个问题尽量一句话。\n\n"
-        "## question_seeds\n"
-        "查看本桌所有已完成轮次的 table_memory（如有），在本桌问题背景下，按照不同的 round 提出以下不同维度的引导性子问题：\n"
-        "- Round 1 发散观察：基于本桌问题和背景材料，引导参与者打开观察面。\n"
+        "查看本桌所有已完成轮次的 table_memory（如有），在本桌问题背景下，按照不同的 round 进行引导：\n"
+        "- Round 1 发散观察：不需要提出小问题，引导参与者打开观察面，没有table_memory不需要提小问题。\n"
         "- Round 2 连接与张力：结合 Round 1 的 table_memory，避开已稳定共识，追问新的转变、挑战少数观点、利益相关者/机制张力等。\n"
         "- Round 3 问题重构：结合前两轮 table_memory，追问原始问题是否要改写、哪个未解决张力可能变成设计机会、哪个假设最值得验证。\n"
-        "注意：最后只提出2-3个可直接开启讨论的简短开放问句，每个问题尽量一句话。不添加太多背景、解释或引导信息；每轮的子问题之间要形成推进。"
+        "注意如需要提出子问题：最后只提出2-3个可直接开启讨论的简短开放问句，每个问题尽量一句话。不添加太多背景、解释或引导信息；每轮的子问题之间要形成推进。"      
+        "如需要提出子问题，请严格使用以下格式（问题三可在只需要两个问题时省略）：\n"
+        "【开场白，说明本轮讨论的关注点（10字以内）】\n"
+        "- 【问题一（一句话引导，不要提供过多信息）】\n"
+        "- 【问题二（一句话引导，不要提供过多信息）】\n"
+        "- 【问题三（一句话引导，不要提供过多信息）】\n"
+
+
     )
     return system, user
 
@@ -130,7 +194,7 @@ def host_synthesis_prompt(
 ) -> tuple[str, str]:
     system = (
         "你是这个 table host 的内部迁移记忆生成视角，正在记录每轮的 formatmemory。"
-        "formatmemory 每轮按顺序记录，只从本轮 speaking agents 的发言中提取：桌子问题下重复出现的主题、少数但有启发的观点、未解决张力。"
+        "formatmemory 每轮按顺序记录，只从本轮 speaking agents 的发言中提取：桌子问题下重复出现的主题、少数但有启发的观点、未解决张力。你需要稍微概括一下pattern，不要直接引用历史讨论的原文。"
         "这是内部记忆，不是可见发言；不要写会议纪要，不要生成完整方案，不要暴露给用户看的 Markdown。"
         "请输出可供系统路由和被上下文引用的严格 JSON。"
     )
@@ -153,6 +217,7 @@ def host_synthesis_prompt(
         f"本轮 speaking agents 的全部发言：\n{joined_contributions}\n\n"
         "请输出 JSON：\n"
         "{\n"
+        f'  "tablememory_usage_description": "{TABLEMEMORY_USAGE_DESCRIPTION}",\n'
         '  "formatmemory": {\n'
         '    "table_question": "本桌问题原文",\n'
         f'    "round_index": {round_index + 1},\n'
@@ -212,7 +277,6 @@ def carry_over_packet_prompt(
     to_table: str,
     after_round: int,
     from_memory: TableMemory,
-    to_question: str,
     agent_contributions: list[str],
 ) -> tuple[str, str]:
     system = (
@@ -227,7 +291,6 @@ def carry_over_packet_prompt(
         f"to_table：{to_table}\n"
         f"after_round：{after_round + 1}\n\n"
         f"该 speaking agent 在本轮对话中的所有发言：\n{chr(10).join(agent_contributions) or '暂无'}\n\n"
-        f"下一桌问题（只帮助生成可迁移洞察，不要写成解决方案）：{to_question}\n\n"
         "请输出 JSON：\n"
         "{\n"
         '  "agent": {"id": "...", "name": "...", "role": "...", "skills": ["..."]},\n'
@@ -236,39 +299,51 @@ def carry_over_packet_prompt(
         f'  "after_round": {after_round + 1},\n'
         '  "agent_generated_memory": {\n'
         '    "skill_lens": "这个 agent 使用了什么 skill 或角色视角",\n'
-        '    "personal_insight": "基于该 agent 本轮发言生成的个人洞察",\n'
-        '    "carry_forward_question": "下一桌可检验或连接的追问"\n'
+        '    "personal_insight": "基于该 agent 本轮发言生成的个人洞察（不要直接引用发言的原文，反思自己的发言，输出对自己观点的整理认知，要求50字以内）"\n'
         '  }\n'
         "}"
     )
     return system, user
 
 
-def global_harvest_prompt(table_memories: dict[str, TableMemory], round_summaries: list[dict]) -> tuple[str, str]:
+def global_harvest_prompt(table_memories: dict[str, TableMemory], table_round_outputs: list[TableRoundOutput]) -> tuple[str, str]:
     system = (
         "你负责 World Cafe 的全局 harvest。你不是 summary merger。"
-        "你要做四件事：聚类、连接、张力识别、机会生成。"
-        "必须显式区分 Pattern Channel（多桌重复出现的主题）与 Weak Signal Channel（只出现一次但高张力/高新颖/高启发的少数观点）。"
+        "你必须直接阅读 speaking agents 的历史对话原文，提取用户主要需求，重新界定设计问题，并给出后续设计方向。"
+        "tablememory或其他二次整理内容仅作你的表述参考，不要当作 harvest 的主要输入。"
+        "后续设计方向最多三个，必须可继续研究、验证或推进设计。"
         "内部可以使用 JSON 组织分析，但给用户展示的 display_markdown 必须自然可读，不要暴露内部字段解释。"
+        "display_markdown 必须控制在800字以内，并严格使用用户指定的中文三段式格式。"
         "如果展示内容中出现设计机会、机会假设或类似表达，请把相关词组或句子加粗。"
     )
-    memories = []
+    table_contexts = []
+    tablememory_sections = []
     for table_id, memory in sorted(table_memories.items()):
-        memories.append(f"## {table_id}\n{format_memory(memory, view='harvest')}")
-    memories_text = "\n\n".join(memories)
-    summaries = "\n".join(str(summary) for summary in round_summaries)
+        table_contexts.append(f"## {table_id}\n桌子问题：{memory.get('question', '')}")
+        tablememory_sections.append(f"## {table_id}\n{format_memory(memory, view='full')}")
+    table_context_text = "\n\n".join(table_contexts) or "暂无"
+    tablememory_text = "\n\n".join(tablememory_sections) or "暂无"
+    speaking_history = format_speaking_agent_history(table_round_outputs)
+    user_note_history = format_user_note_history(table_round_outputs)
     user = (
-        "以下是所有桌子的桌长记忆：\n\n"
-        f"{memories_text}\n\n"
-        "轮次摘要：\n"
-        f"{summaries}\n\n"
-        "请优先输出 JSON，并包含 500字以内、可直接给用户看的 display_markdown。display_markdown 建议包含：\n"
-        "## Shared Patterns\n"
-        "## Weak Signals\n"
-        "## Cross-table Tensions\n"
-        "## Reframed Questions\n"
-        "## Next Experiments\n"
-        "如果无法输出 JSON，则直接输出同样结构的自然 Markdown。"
+        "以下是所有 speaking agents 的历史对话原文，作为 harvest 主证据（优先级最高）：\n\n"
+        f"{speaking_history}\n\n"
+        "以下是所有桌子的讨论问题，仅用于定位对话来源：\n\n"
+        f"{table_context_text}\n\n"
+        "以下是所有桌子的 tablememory，继承了每桌所有轮的讨论：\n\n"
+        f"{tablememory_text}\n\n"
+        "以下是用户每轮标记的笔记，用于校准用户关注的洞察、张力和机会线索：\n\n"
+        f"{user_note_history}\n\n"
+        "请优先输出 JSON，并包含字段 user_needs、reframed_design_problem、next_design_directions、display_markdown。\n"
+        "display_markdown 必须800字以内，可直接给用户看，并严格使用以下格式：\n"
+        "设计洞察：\n"
+        "### 用户主要需求的提取：（参考每一轮的洞察或共识）\n"
+        "### 设计问题的重新界定：（参考每一轮的转变）\n"
+        "### 不超过三个后续的设计方向：\n"
+        "- ...\n"
+        "- ...\n"
+        "- ...\n"
+        "第三部分最多输出三个方向。如果无法输出 JSON，则直接输出同样结构的自然 Markdown。"
     )
     return system, user
 

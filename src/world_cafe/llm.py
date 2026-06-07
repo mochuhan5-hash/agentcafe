@@ -9,6 +9,8 @@ from typing import Protocol
 
 import httpx
 
+from world_cafe.state import TABLEMEMORY_USAGE_DESCRIPTION
+
 
 DEFAULT_OPENAI_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 DEFAULT_OPENAI_MODEL = "qwen-plus"
@@ -105,6 +107,7 @@ class DryRunCafeLLM:
         if '"formatmemory"' in user:
             return json.dumps(
                 {
+                    "tablememory_usage_description": TABLEMEMORY_USAGE_DESCRIPTION,
                     "formatmemory": {
                         "table_question": "本桌问题原文",
                         "round_index": 1,
@@ -128,22 +131,18 @@ class DryRunCafeLLM:
                     "agent_generated_memory": {
                         "skill_lens": "reframing",
                         "personal_insight": "不要把上一桌的共识当成新桌前提。",
-                        "carry_forward_question": "用户旅程分歧是否能解释当前桌的系统张力？",
                     },
                 },
                 ensure_ascii=False,
             )
         if "全局 harvest" in system or "global harvest" in system.lower():
             return (
-                "## Shared Patterns\n"
-                "- 多桌都在从抽象议题转向可验证行动。\n"
-                "- 桌长记忆帮助后续轮次避免重复讨论。\n\n"
-                "## Weak Signals\n"
-                "- 少数观点提示：被平均化的边缘用户可能暴露新的设计机会。\n\n"
-                "## Cross-table Tensions\n"
-                "- 开放探索与阶段性收束需要节奏控制。\n\n"
-                "## Next Experiments\n"
-                "- 每桌选择一个最小可行实验，并定义观察指标。\n"
+                "设计洞察：\n"
+                "1、用户主要需求的提取：用户需要把抽象议题转成可验证行动，同时避免后续轮次重复讨论。\n"
+                "2、设计问题的重新界定：如何在开放探索中保留边缘用户信号，并把它转化为可验证的设计机会。\n"
+                "3、不超过三个后续的设计方向：\n"
+                "- 选择一个边缘用户断点作为问题重构入口。\n"
+                "- 为每桌设置一个最小可行实验和观察指标。\n"
             )
         return (
             f"我先接着现场的讨论往前推一步。当前问题里最值得抓住的，是把抽象判断转成一个可验证的小假设。"

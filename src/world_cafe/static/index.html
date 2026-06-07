@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/styles.css?v=20260607-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260608-ui-refactor-3" />
   </head>
   <body>
     <div class="app-shell mode-config">
@@ -62,10 +62,6 @@
                   <input id="speakersPerTable" type="number" min="1" max="8" value="3" />
                 </label>
                 <label>
-                  <span>轮数</span>
-                  <input id="roundCount" type="number" min="1" max="6" value="3" />
-                </label>
-                <label>
                   <span>每人发言次数</span>
                   <input id="speechesPerAgent" type="number" min="1" max="8" value="3" />
                 </label>
@@ -81,9 +77,10 @@
                     </svg>
                     <span>背景材料（Markdown，可选）</span>
                   </label>
-                  <input id="backgroundFile" type="file" accept=".md,.markdown,text/markdown,text/plain" />
+                  <input id="backgroundFile" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" />
                   <div class="background-meta">
                     <span id="backgroundSummary">未上传背景材料</span>
+                    <button type="button" class="secondary" id="chooseBackgroundBtn">选择文件</button>
                     <button type="button" class="secondary" id="clearBackgroundBtn" hidden>清除</button>
                   </div>
                 </div>
@@ -206,6 +203,6 @@
       </div>
     </div>
 
-    <script src="/static/app.js?v=20260607-2" type="module"></script>
+    <script src="/static/app.js?v=20260608-ui-refactor-5" type="module"></script>
   </body>
 </html>

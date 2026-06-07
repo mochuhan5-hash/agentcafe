@@ -39,7 +39,7 @@ async def facilitate_request(
     if table_count < 1:
         raise ValueError("table_count must be at least 1")
     system = (
-        "你是世界咖啡流程中的 facilitator agent。你只负责为每张小桌生成一个初始讨论问句。"
+        "你是世界咖啡流程中的 facilitator agent。你只负责为每张小桌生成一个初始讨论问句，不同的桌子讨论不同的设计问题。"
         "每张桌只能有一个问句；问句必须简短、开放、中立、可迁移，不要带解释、细节、引导语或解决方案。"
         "最终 tables 数量必须严格等于 table_count；只输出 JSON，不要输出 Markdown。"
     )
@@ -56,6 +56,7 @@ async def facilitate_request(
         f"{_format_background(background_context, background_filename)}"
         f"本次必须生成 table_count={table_count} 张小桌问句，tables 数组长度必须等于 {table_count}。\n"
         "每个 question 必须只有一个问句，建议 8-24 个汉字，不要包含冒号、解释、分点、背景信息或引导语。\n"
+        "每个 question 之间要有较大的差距，要引发不同（异质）维度的设计思考\n"
         "请严格输出如下 JSON 结构：\n"
         "{\n"
         '  "tables": [\n'
