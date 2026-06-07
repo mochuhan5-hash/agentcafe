@@ -48,53 +48,57 @@
             <span id="roundBadge">0 / 0</span>
           </div>
 
-          <div class="chat-log" id="chatLog" aria-live="polite"></div>
-
-          <div class="settings-panel" aria-label="流程设置">
-            <label>
-              <span>桌数</span>
-              <input id="tableCount" type="number" min="1" max="8" value="4" />
-            </label>
-            <label>
-              <span>每桌发言人数</span>
-              <input id="speakersPerTable" type="number" min="1" max="8" value="3" />
-            </label>
-            <label>
-              <span>轮数</span>
-              <input id="roundCount" type="number" min="1" max="6" value="3" />
-            </label>
-            <label>
-              <span>每人发言次数</span>
-              <input id="speechesPerAgent" type="number" min="1" max="8" value="3" />
-            </label>
-          </div>
-
           <form class="request-form" id="requestForm">
-            <div class="background-upload">
-              <label for="backgroundFile" class="custom-file-label">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-                <span>背景材料（Markdown，可选）</span>
-              </label>
-              <input id="backgroundFile" type="file" accept=".md,.markdown,text/markdown,text/plain" />
-              <div class="background-meta">
-                <span id="backgroundSummary">未上传背景材料</span>
-                <button type="button" class="secondary" id="clearBackgroundBtn" hidden>清除</button>
+            <div class="request-pane-scrollable">
+              <div class="chat-log" id="chatLog" aria-live="polite"></div>
+
+              <div class="settings-panel" aria-label="流程设置">
+                <label>
+                  <span>桌数</span>
+                  <input id="tableCount" type="number" min="1" max="8" value="4" />
+                </label>
+                <label>
+                  <span>每桌发言人数</span>
+                  <input id="speakersPerTable" type="number" min="1" max="8" value="3" />
+                </label>
+                <label>
+                  <span>轮数</span>
+                  <input id="roundCount" type="number" min="1" max="6" value="3" />
+                </label>
+                <label>
+                  <span>每人发言次数</span>
+                  <input id="speechesPerAgent" type="number" min="1" max="8" value="3" />
+                </label>
               </div>
-            </div>
-            
-            <div class="textarea-wrapper">
-              <label for="userRequest">用户请求</label>
-              <textarea
-                id="userRequest"
-                name="userRequest"
-                rows="5"
-                placeholder="输入一个希望通过世界咖啡展开的主题或任务..."
-                required
-              ></textarea>
+
+              <div class="request-form-content">
+                <div class="background-upload">
+                  <label for="backgroundFile" class="custom-file-label">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    <span>背景材料（Markdown，可选）</span>
+                  </label>
+                  <input id="backgroundFile" type="file" accept=".md,.markdown,text/markdown,text/plain" />
+                  <div class="background-meta">
+                    <span id="backgroundSummary">未上传背景材料</span>
+                    <button type="button" class="secondary" id="clearBackgroundBtn" hidden>清除</button>
+                  </div>
+                </div>
+                
+                <div class="textarea-wrapper">
+                  <label for="userRequest">用户请求</label>
+                  <textarea
+                    id="userRequest"
+                    name="userRequest"
+                    rows="5"
+                    placeholder="输入一个希望通过世界咖啡展开的主题或任务..."
+                    required
+                  ></textarea>
+                </div>
+              </div>
             </div>
             
             <div class="button-row">

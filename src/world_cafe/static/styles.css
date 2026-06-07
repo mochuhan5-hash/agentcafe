@@ -261,7 +261,9 @@ h1, h2, h3, h4 {
   display: grid;
   grid-template-columns: minmax(340px, 450px) minmax(0, 1fr);
   gap: 20px;
-  min-height: 0;
+  height: calc(100vh - 90px);
+  min-height: 720px;
+  max-height: 860px;
   transition: grid-template-columns 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), gap 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
@@ -300,7 +302,7 @@ h1, h2, h3, h4 {
 .request-pane {
   display: flex;
   flex-direction: column;
-  min-height: 720px;
+  height: 100%;
   transition: 
     width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
     max-width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
@@ -316,7 +318,7 @@ h1, h2, h3, h4 {
   display: grid;
   grid-template-rows: auto 1fr;
   gap: 16px;
-  min-height: 720px;
+  height: 100%;
   padding: 20px;
 }
 
@@ -421,9 +423,25 @@ h1, h2, h3, h4 {
 .request-form {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  border-bottom: none;
+}
+
+.request-pane-scrollable {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.request-form-content {
+  display: flex;
+  flex-direction: column;
   gap: 16px;
   padding: 20px;
-  border-bottom: 1px solid var(--line);
 }
 
 .background-upload {
@@ -476,6 +494,15 @@ input[type="file"] {
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.request-form .button-row {
+  padding: 16px 20px 20px 20px;
+  border-top: 1px solid var(--line);
+  background: rgba(28, 22, 18, 0.45);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  margin-top: auto;
 }
 
 .button-row {
@@ -1911,11 +1938,14 @@ input[type="file"] {
 @media (max-width: 1120px) {
   .workspace {
     grid-template-columns: 1fr;
+    height: auto;
+    max-height: none;
   }
 
   .request-pane,
   .discussion-pane {
     min-height: auto;
+    height: auto;
   }
 
   .discussion-layout {
