@@ -1203,7 +1203,7 @@ function setStatus(text, tone) {
 
 function setBusy(isBusy) {
   facilitateBtn.disabled = isBusy;
-  facilitateBtn.textContent = isBusy ? "Facilitating..." : "✦ Facilitate";
+  facilitateBtn.textContent = isBusy ? "规划中..." : "✦ 主题规划";
 }
 
 function isNoteTakingActive() {
