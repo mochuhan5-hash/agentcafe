@@ -262,16 +262,27 @@ h1, h2, h3, h4 {
   grid-template-columns: minmax(340px, 450px) minmax(0, 1fr);
   gap: 20px;
   min-height: 0;
-  transition: grid-template-columns 0.3s ease;
+  transition: grid-template-columns 0.4s cubic-bezier(0.25, 0.8, 0.25, 1), gap 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 /* Layout transition between Setup and Active Discussion (Salon Mode) */
 .mode-salon .request-pane {
-  display: none !important;
+  width: 0 !important;
+  max-width: 0 !important;
+  min-width: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-width: 0 !important;
+  opacity: 0 !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+  transform: scaleX(0.8) translateX(-50px) !important;
+  overflow: hidden !important;
 }
 
 .mode-salon .workspace {
-  grid-template-columns: 1fr;
+  grid-template-columns: 0px 1fr;
+  gap: 0;
 }
 
 .request-pane,
@@ -290,6 +301,15 @@ h1, h2, h3, h4 {
   display: flex;
   flex-direction: column;
   min-height: 720px;
+  transition: 
+    width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
+    max-width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
+    opacity 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
+    transform 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
+    margin-right 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
+    padding 0.4s cubic-bezier(0.25, 0.8, 0.25, 1),
+    border-width 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transform-origin: left center;
 }
 
 .discussion-pane {
@@ -478,6 +498,33 @@ input[type="file"] {
   gap: 16px;
   overflow-y: auto;
   flex: 1;
+}
+
+.question-editor[hidden] {
+  display: none !important;
+}
+
+@keyframes fadeInSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.question-editor:not([hidden]) {
+  animation: fadeInSlideUp 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+}
+
+.discussion-layout {
+  animation: fadeInSlideUp 0.4s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+}
+
+.discussion-toolbar {
+  animation: fadeInSlideUp 0.3s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
 }
 
 .question-field {
