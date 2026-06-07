@@ -1204,6 +1204,27 @@ input[type="file"] {
   pointer-events: auto;
 }
 
+/* Host Popover overrides (opens downward) */
+.seating-chart-seat.host .seat-memory-popover {
+  bottom: auto;
+  top: calc(100% + 12px);
+  transform: translateX(-50%) translateY(-6px);
+}
+
+.seating-chart-seat.host:hover .seat-memory-popover,
+.seating-chart-seat.host .seat-memory-popover.visible {
+  transform: translateX(-50%) translateY(0) !important;
+}
+
+.seating-chart-seat.host .seat-memory-popover::after {
+  bottom: auto;
+  top: -6px;
+  border-right: none;
+  border-bottom: none;
+  border-left: 1px solid rgba(220, 160, 100, 0.25);
+  border-top: 1px solid rgba(220, 160, 100, 0.25);
+}
+
 .seat-memory-popover::-webkit-scrollbar {
   width: 4px;
 }
