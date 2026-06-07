@@ -509,6 +509,7 @@ input[type="file"] {
   gap: 16px;
   overflow-y: auto;
   flex: 1;
+  max-height: 52vh;
 }
 
 /* Editor Active State */
@@ -563,6 +564,12 @@ input[type="file"] {
   border: 1px solid var(--line);
   padding: 16px;
   border-radius: 12px;
+}
+
+.question-field textarea {
+  min-height: 48px;
+  max-height: 90px;
+  resize: vertical;
 }
 
 .assignment-field {
