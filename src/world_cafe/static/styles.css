@@ -559,11 +559,41 @@ input[type="file"] {
 .question-field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   background: rgba(220, 160, 100, 0.03);
   border: 1px solid var(--line);
   padding: 16px;
   border-radius: 12px;
+}
+
+.question-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+}
+
+.host-badge-editor {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(220, 160, 100, 0.08);
+  border: 1px solid rgba(220, 160, 100, 0.16);
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1;
+}
+
+.host-badge-editor .host-label {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.host-badge-editor .host-name {
+  color: var(--amber);
+  font-weight: 700;
 }
 
 .question-field textarea {
@@ -572,30 +602,77 @@ input[type="file"] {
   resize: vertical;
 }
 
-.assignment-field {
+.speaker-select-section {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-top: 4px;
+}
+
+.prompt-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   background: rgba(18, 12, 8, 0.3);
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 12px 14px;
-  margin-top: -6px;
-  margin-bottom: 8px;
+  padding: 16px;
+  margin: 0;
+  max-height: 100%;
 }
 
-.question-editor .assignment-field {
-  margin: 0;
+.prompt-header {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 6px;
+  margin-bottom: 2px;
 }
 
 .agent-prompt-list {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+  overflow-y: auto;
+  flex: 1;
 }
 
 .agent-prompt-list:empty {
   display: none;
+}
+
+.empty-prompt-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 1;
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--muted);
+  border: 1px dashed rgba(220, 160, 100, 0.12);
+  border-radius: 8px;
+  background: rgba(220, 160, 100, 0.01);
+}
+
+.empty-prompt-placeholder .placeholder-icon {
+  font-size: 20px;
+  animation: floatIcon 3s ease-in-out infinite;
+}
+
+@keyframes floatIcon {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.empty-prompt-placeholder .placeholder-text {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
 }
 
 .agent-prompt-box {

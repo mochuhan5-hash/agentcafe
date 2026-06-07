@@ -594,14 +594,9 @@ function renderQuestionEditor(tables) {
   questionEditor.innerHTML = "";
   buildDefaultAssignments(tables);
   tables.forEach((table) => {
-    const field = document.createElement("div");
-    field.className = "question-field";
-    field.innerHTML = `
-      <label for="${table.table_id}">${table.table_id}</label>
-      <textarea id="${table.table_id}" data-table-id="${table.table_id}">${escapeHtml(table.question)}</textarea>
-    `;
-    questionEditor.append(field);
-    questionEditor.append(renderAssignmentField(table.table_id));
+    questionEditor.append(renderLeftField(table));
+    questionEditor.append(renderRightField(table.table_id));
+    refreshAgentPromptBoxes(table.table_id);
   });
 }
 
@@ -629,10 +624,11 @@ function readEditedQuestions() {
   });
 }
 
-function renderAssignmentField(tableId) {
-  const wrapper = document.createElement("div");
-  wrapper.className = "assignment-field";
-  wrapper.dataset.assignmentTableId = tableId;
+function renderLeftField(table) {
+  const tableId = table.table_id;
+  const field = document.createElement("div");
+  field.className = "question-field";
+  
   const hostId = hostAssignments[tableId];
   const host = availableAgents.find((agent) => agent.id === hostId);
   const speakers = new Set(speakerAssignments[tableId] || []);
@@ -643,39 +639,75 @@ function renderAssignmentField(tableId) {
       return `<option value="${escapeHtml(agent.id)}" ${selected}>${escapeHtml(agent.name)} · ${escapeHtml(agent.role || agent.id)}</option>`;
     })
     .join("");
-  wrapper.innerHTML = `
-      <div class="assignment-meta">
-      <span>桌长 ${escapeHtml(host?.name || hostId || "")}</span>
-      <span data-selected-count>已选 ${speakers.size} 人</span>
+
+  field.innerHTML = `
+    <div class="question-header">
+      <label for="${tableId}">${tableId.replace("_", " ").toUpperCase()}</label>
+      <div class="host-badge-editor">
+        <span class="host-label">桌长:</span>
+        <span class="host-name">${escapeHtml(host?.name || hostId || "")}</span>
+      </div>
     </div>
-    <select class="agent-select" multiple size="7" data-agent-select="${tableId}">
-      ${options}
-    </select>
-    <div class="agent-prompt-list" data-prompt-list-table="${tableId}"></div>
+    <textarea id="${tableId}" data-table-id="${tableId}" placeholder="请输入讨论主题/引导问题...">${escapeHtml(table.question)}</textarea>
+    
+    <div class="speaker-select-section">
+      <div class="assignment-meta">
+        <span>选择普通 Agent</span>
+        <span data-selected-count="${tableId}">已选 ${speakers.size} 人</span>
+      </div>
+      <select class="agent-select" multiple size="4" data-agent-select="${tableId}">
+        ${options}
+      </select>
+    </div>
   `;
-  const select = wrapper.querySelector("select");
+
+  const select = field.querySelector("select");
   select.addEventListener("change", () => {
     speakerAssignments[tableId] = [...select.selectedOptions].map((option) => option.value);
-    wrapper.querySelector("[data-selected-count]").textContent =
+    field.querySelector(`[data-selected-count="${tableId}"]`).textContent =
       `已选 ${speakerAssignments[tableId].length} 人`;
-    refreshAgentPromptBoxes(wrapper, tableId);
+    refreshAgentPromptBoxes(tableId);
   });
-  // Initial render of prompt boxes for pre-selected agents
-  refreshAgentPromptBoxes(wrapper, tableId);
+
+  return field;
+}
+
+function renderRightField(tableId) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "prompt-field";
+  wrapper.dataset.assignmentTableId = tableId;
+  wrapper.innerHTML = `
+    <div class="prompt-header">
+      <span>Agent 提示词配置</span>
+    </div>
+    <div class="agent-prompt-list" data-prompt-list-table="${tableId}"></div>
+  `;
   return wrapper;
 }
 
-function refreshAgentPromptBoxes(wrapper, tableId) {
-  const container = wrapper.querySelector(`[data-prompt-list-table="${tableId}"]`);
+function refreshAgentPromptBoxes(tableId) {
+  const container = questionEditor.querySelector(`[data-prompt-list-table="${tableId}"]`);
   if (!container) return;
   const selectedIds = new Set(speakerAssignments[tableId] || []);
+  
   // Preserve existing prompt values
   const existingValues = {};
   container.querySelectorAll("textarea[data-agent-prompt-id]").forEach((ta) => {
     existingValues[ta.dataset.agentPromptId] = ta.value;
   });
+  
   container.innerHTML = "";
-  if (selectedIds.size === 0) return;
+  
+  if (selectedIds.size === 0) {
+    container.innerHTML = `
+      <div class="empty-prompt-placeholder">
+        <span class="placeholder-icon">✨</span>
+        <span class="placeholder-text">在左侧选择普通 Agent 以配置其专属提示词</span>
+      </div>
+    `;
+    return;
+  }
+  
   selectedIds.forEach((agentId) => {
     const agent = availableAgents.find((a) => a.id === agentId);
     const agentName = agent?.name || agentId;
