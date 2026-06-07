@@ -842,6 +842,7 @@ input[type="file"] {
   place-items: center;
   border-radius: 50%;
   font-size: 11px;
+  white-space: nowrap;
 }
 
 .agent-status-avatar.green { border-color: rgba(78, 186, 166, 0.3); }
@@ -940,7 +941,7 @@ input[type="file"] {
   border: 1px solid var(--line);
   border-radius: 14px;
   background: rgba(28, 22, 18, 0.45);
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 8px 24px rgba(0,0,0,0.2);
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
@@ -961,6 +962,8 @@ input[type="file"] {
   padding: 16px;
   border-bottom: 1px solid var(--line);
   background: rgba(220, 160, 100, 0.02);
+  border-top-left-radius: 13px;
+  border-top-right-radius: 13px;
 }
 
 .table-title {
@@ -1190,6 +1193,7 @@ input[type="file"] {
   border-bottom: 1px solid rgba(220, 160, 100, 0.25);
 }
 
+.seating-chart-seat:hover .seat-memory-popover,
 .seat-memory-popover.visible {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
@@ -1421,6 +1425,7 @@ input[type="file"] {
   cursor: pointer;
   transition: all 0.25s ease;
   box-shadow: 0 3px 8px rgba(0,0,0,0.2);
+  white-space: nowrap;
 }
 
 .message-avatar:hover {
@@ -1996,4 +2001,25 @@ input[type="file"] {
   .opportunity-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* Modal Agent Memory Section */
+.modal-memory-body {
+  background: rgba(18, 12, 8, 0.4);
+  border: 1px solid var(--line);
+  padding: 12px 14px;
+  border-radius: 10px;
+  max-height: 150px;
+  overflow-y: auto;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #e2dcd7;
+}
+
+.modal-memory-body p {
+  margin-bottom: 8px;
+}
+
+.modal-memory-body p:last-child {
+  margin-bottom: 0;
 }

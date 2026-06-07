@@ -200,6 +200,25 @@ function openAgentProfile(agentId) {
   }
   if (style) style.textContent = profile.style || "暂无风格描述。";
 
+  // Dynamic memory lookup and rendering inside modal
+  const memorySection = document.querySelector("#modalAgentMemorySection");
+  if (memorySection) {
+    const snapshot = agentMemorySnapshots[agentId];
+    if (snapshot) {
+      const rows = formatMemorySnapshot(snapshot);
+      const body = rows.length
+        ? rows.map((row) => `<p>${renderInlineMarkdown(escapeHtml(row))}</p>`).join("")
+        : "<p>暂无内在记忆记录。</p>";
+      memorySection.innerHTML = `
+        <h4>当前内在记忆</h4>
+        <div class="modal-memory-body">${body}</div>
+      `;
+      memorySection.hidden = false;
+    } else {
+      memorySection.hidden = true;
+    }
+  }
+
   if (modal) modal.hidden = false;
 }
 
@@ -819,7 +838,6 @@ function drawSeatingChart(tableElement, tableId, agentIds, activeSpeakerId = nul
     seat.append(popover);
 
     seat.addEventListener("click", (e) => {
-      e.stopPropagation();
       // Close all other popovers in this container first
       container.querySelectorAll(".seat-memory-popover.visible").forEach((p) => {
         if (p !== popover) p.classList.remove("visible");
