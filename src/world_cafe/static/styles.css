@@ -1051,7 +1051,7 @@ input[type="file"] {
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   z-index: 3;
   white-space: nowrap;
-  overflow: hidden;
+  overflow: visible;
   /* Coffee Cup & Saucer Top-View box shadows */
   box-shadow: 
     0 4px 8px rgba(0, 0, 0, 0.4),
@@ -1059,8 +1059,12 @@ input[type="file"] {
     inset 0 0 0 4px rgba(220, 160, 100, 0.15);
 }
 
+.seat-initials {
+  pointer-events: none;
+}
+
 .seating-chart-seat:hover {
-  transform: translate(-50%, -50%) scale(1.18);
+  transform: translate(-50%, -50%) scale(1.18) !important;
   border-color: #fff;
   color: #fff;
   box-shadow: 
