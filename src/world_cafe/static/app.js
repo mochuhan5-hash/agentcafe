@@ -53,6 +53,7 @@ let speakerAssignments = {};
 let backgroundContext = "";
 let backgroundFilename = "";
 let currentTableAgents = {};
+let agentMemorySnapshots = {};
 
 const phaseOrder = ["facilitate", "setup", "round_started", "rotation", "harvest", "done"];
 const agentRoleStatuses = {
@@ -757,12 +758,11 @@ function drawSeatingChart(tableElement, tableId, agentIds, activeSpeakerId = nul
     seat.className = "seating-chart-seat";
     seat.dataset.seatAgentId = agentId;
     
-    if (i === 0) {
+    const isHost = i === 0;
+    if (isHost) {
       seat.classList.add("host");
-      seat.title = `桌长: ${name}`;
     } else {
       seat.classList.add("speaker");
-      seat.title = `发言嘉宾: ${name}`;
     }
     
     if (agentId === activeSpeakerId) {
@@ -774,8 +774,26 @@ function drawSeatingChart(tableElement, tableId, agentIds, activeSpeakerId = nul
     }
     
     const seatContent = document.createElement("span");
+    seatContent.className = "seat-initials";
     seatContent.textContent = initials;
     seat.append(seatContent);
+
+    // Memory popover
+    const popover = document.createElement("div");
+    popover.className = "seat-memory-popover";
+    const snapshot = agentMemorySnapshots[agentId];
+    const roleTag = isHost ? "桌长" : "发言嘉宾";
+    popover.innerHTML = renderSeatMemoryCard(name, roleTag, snapshot);
+    seat.append(popover);
+
+    seat.addEventListener("click", (e) => {
+      e.stopPropagation();
+      // Close all other popovers in this container first
+      container.querySelectorAll(".seat-memory-popover.visible").forEach((p) => {
+        if (p !== popover) p.classList.remove("visible");
+      });
+      popover.classList.toggle("visible");
+    });
     
     // Distribute seats radially around table (radius 42px)
     const angle = (i * 2 * Math.PI) / M - Math.PI / 2;
@@ -831,6 +849,7 @@ function ensureRound(tableId, roundIndex, agentIds = []) {
 function appendHostOpening(metadata) {
   const round = ensureRound(metadata.table_id, metadata.round_index, metadata.agent_ids || []);
   if (!round) return;
+  if (metadata.memory_snapshot) agentMemorySnapshots[metadata.host_id] = metadata.memory_snapshot;
   const slot = round.querySelector("[data-host-opening]");
   if (!slot) return;
   slot.innerHTML = renderAgentMessage({
@@ -853,6 +872,7 @@ function appendHostOpening(metadata) {
 function appendContribution(metadata) {
   const round = ensureRound(metadata.table_id, metadata.round_index, []);
   if (!round) return;
+  if (metadata.memory_snapshot) agentMemorySnapshots[metadata.agent_id] = metadata.memory_snapshot;
   const list = round.querySelector("[data-contributions]");
   const speech = document.createElement("div");
   speech.className = "speech";
@@ -900,6 +920,7 @@ function appendContribution(metadata) {
 function appendHostRecord(metadata) {
   const round = ensureRound(metadata.table_id, metadata.round_index, []);
   if (!round) return;
+  if (metadata.memory_snapshot) agentMemorySnapshots[metadata.host_id] = metadata.memory_snapshot;
   const slot = round.querySelector("[data-host-record]");
   slot.innerHTML = `
     ${renderAgentMessage({
@@ -964,6 +985,56 @@ function renderMemoryTooltip(agentName, snapshot) {
     </span>
   `;
 }
+
+function renderSeatMemoryCard(agentName, roleTag, snapshot) {
+  const rows = formatMemorySnapshot(snapshot);
+  const sections = [];
+  if (snapshot && snapshot.kind === "table_host") {
+    if (snapshot.living_summary) {
+      sections.push(`<div class="smc-section"><div class="smc-section-title">📝 桌面记忆</div><div class="smc-section-body">${escapeHtml(snapshot.living_summary)}</div></div>`);
+    }
+    if (Array.isArray(snapshot.key_insights) && snapshot.key_insights.length) {
+      sections.push(`<div class="smc-section"><div class="smc-section-title">💡 保留洞察</div><ul class="smc-list">${snapshot.key_insights.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul></div>`);
+    }
+    if (Array.isArray(snapshot.open_questions) && snapshot.open_questions.length) {
+      sections.push(`<div class="smc-section"><div class="smc-section-title">❓ 开放问题</div><ul class="smc-list">${snapshot.open_questions.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul></div>`);
+    }
+    if (Array.isArray(snapshot.tensions) && snapshot.tensions.length) {
+      sections.push(`<div class="smc-section"><div class="smc-section-title">⚡ 张力</div><ul class="smc-list">${snapshot.tensions.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul></div>`);
+    }
+    if (Array.isArray(snapshot.next_round_question_seeds) && snapshot.next_round_question_seeds.length) {
+      sections.push(`<div class="smc-section"><div class="smc-section-title">🌱 下一轮问题种子</div><ul class="smc-list">${snapshot.next_round_question_seeds.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul></div>`);
+    }
+  } else if (snapshot) {
+    if (snapshot.bridge_intent) {
+      sections.push(`<div class="smc-section"><div class="smc-section-title">🔗 迁移意图</div><div class="smc-section-body">${escapeHtml(snapshot.bridge_intent)}</div></div>`);
+    }
+    if (snapshot.agent_generated_memory) {
+      const mem = snapshot.agent_generated_memory;
+      if (typeof mem === "string" && mem.trim()) {
+        sections.push(`<div class="smc-section"><div class="smc-section-title">🧠 个人记忆</div><div class="smc-section-body">${escapeHtml(mem)}</div></div>`);
+      } else if (typeof mem === "object" && !Array.isArray(mem)) {
+        const items = Object.entries(mem).filter(([, v]) => v !== null && v !== "").map(([k, v]) => `<li><strong>${escapeHtml(k)}</strong>: ${escapeHtml(String(v))}</li>`).join("");
+        if (items) sections.push(`<div class="smc-section"><div class="smc-section-title">🧠 个人记忆</div><ul class="smc-list">${items}</ul></div>`);
+      }
+    }
+  }
+  const body = sections.length
+    ? sections.join("")
+    : '<div class="smc-empty">暂无内在记忆</div>';
+  return `
+    <div class="smc-header">
+      <span class="smc-name">${escapeHtml(agentName)}</span>
+      <span class="smc-role">${escapeHtml(roleTag)}</span>
+    </div>
+    <div class="smc-body">${body}</div>
+  `;
+}
+
+// Dismiss seat memory popovers when clicking outside
+document.addEventListener("click", () => {
+  document.querySelectorAll(".seat-memory-popover.visible").forEach((p) => p.classList.remove("visible"));
+});
 
 function formatMemorySnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== "object") return [];
@@ -1066,6 +1137,7 @@ function resetRunView() {
   speechesPerAgent = getSpeechesPerAgent();
   isPaused = false;
   seenEventKeys = new Set();
+  agentMemorySnapshots = {};
   notebookEntries = [];
   noteSequence = 0;
   pendingNoteSelection = null;
