@@ -581,6 +581,46 @@ input[type="file"] {
   margin: 0;
 }
 
+.agent-prompt-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.agent-prompt-list:empty {
+  display: none;
+}
+
+.agent-prompt-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(220, 160, 100, 0.04);
+  border: 1px solid rgba(220, 160, 100, 0.12);
+  animation: fadeInSlideUp 0.25s cubic-bezier(0.25, 0.8, 0.25, 1) forwards;
+}
+
+@keyframes fadeInSlideUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.agent-prompt-box label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--amber);
+  letter-spacing: 0.3px;
+}
+
+.agent-prompt-box textarea {
+  font-size: 11px;
+  min-height: 36px;
+  padding: 8px 10px;
+  border-radius: 8px;
+}
+
 .assignment-meta {
   display: flex;
   align-items: center;

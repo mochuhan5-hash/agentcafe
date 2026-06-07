@@ -598,10 +598,6 @@ function renderQuestionEditor(tables) {
     field.innerHTML = `
       <label for="${table.table_id}">${table.table_id}</label>
       <textarea id="${table.table_id}" data-table-id="${table.table_id}">${escapeHtml(table.question)}</textarea>
-      <div style="margin-top: 10px;">
-        <label style="font-size: 11px; color: var(--muted); margin-bottom: 4px; display: block;">自定义该桌普通 Agent 提示词 (System Prompt Override)</label>
-        <textarea id="prompt-${table.table_id}" data-table-prompt-id="${table.table_id}" rows="2" placeholder="给该桌普通发言 Agent 加上额外的 System Prompt 约束/视角引导... (可选)" style="font-size: 12px; min-height: 50px;"></textarea>
-      </div>
     `;
     questionEditor.append(field);
     questionEditor.append(renderAssignmentField(table.table_id));
@@ -611,16 +607,23 @@ function renderQuestionEditor(tables) {
 function readEditedQuestions() {
   return [...questionEditor.querySelectorAll("textarea[data-table-id]")].map((textarea) => {
     const tableId = textarea.dataset.tableId;
-    const promptTextarea = questionEditor.querySelector(`textarea[data-table-prompt-id="${tableId}"]`);
-    const agentSystemPrompt = promptTextarea ? promptTextarea.value.trim() : "";
     const matchingTable = facilitatedTables.find((table) => table.table_id === tableId) || {};
+    // Gather per-agent prompts from the assignment field and combine
+    const agentPromptParts = [];
+    questionEditor.querySelectorAll(`textarea[data-agent-prompt-for][data-agent-prompt-table="${tableId}"]`).forEach((ta) => {
+      const val = ta.value.trim();
+      if (val) {
+        const agentName = ta.dataset.agentPromptFor || ta.dataset.agentPromptId;
+        agentPromptParts.push(`[${agentName}] ${val}`);
+      }
+    });
     return {
       ...matchingTable,
       table_id: tableId,
       parent_question: matchingTable.parent_question || requestInput.value.trim(),
       question: textarea.value.trim(),
       guiding_question: textarea.value.trim(),
-      agent_system_prompt: agentSystemPrompt,
+      agent_system_prompt: agentPromptParts.join("\n"),
     };
   });
 }
@@ -647,14 +650,48 @@ function renderAssignmentField(tableId) {
     <select class="agent-select" multiple size="7" data-agent-select="${tableId}">
       ${options}
     </select>
+    <div class="agent-prompt-list" data-prompt-list-table="${tableId}"></div>
   `;
   const select = wrapper.querySelector("select");
   select.addEventListener("change", () => {
     speakerAssignments[tableId] = [...select.selectedOptions].map((option) => option.value);
     wrapper.querySelector("[data-selected-count]").textContent =
       `已选 ${speakerAssignments[tableId].length} 人`;
+    refreshAgentPromptBoxes(wrapper, tableId);
   });
+  // Initial render of prompt boxes for pre-selected agents
+  refreshAgentPromptBoxes(wrapper, tableId);
   return wrapper;
+}
+
+function refreshAgentPromptBoxes(wrapper, tableId) {
+  const container = wrapper.querySelector(`[data-prompt-list-table="${tableId}"]`);
+  if (!container) return;
+  const selectedIds = new Set(speakerAssignments[tableId] || []);
+  // Preserve existing prompt values
+  const existingValues = {};
+  container.querySelectorAll("textarea[data-agent-prompt-id]").forEach((ta) => {
+    existingValues[ta.dataset.agentPromptId] = ta.value;
+  });
+  container.innerHTML = "";
+  if (selectedIds.size === 0) return;
+  selectedIds.forEach((agentId) => {
+    const agent = availableAgents.find((a) => a.id === agentId);
+    const agentName = agent?.name || agentId;
+    const box = document.createElement("div");
+    box.className = "agent-prompt-box";
+    box.innerHTML = `
+      <label>${escapeHtml(agentName)} · 提示词</label>
+      <textarea
+        data-agent-prompt-id="${escapeHtml(agentId)}"
+        data-agent-prompt-for="${escapeHtml(agentName)}"
+        data-agent-prompt-table="${escapeHtml(tableId)}"
+        rows="2"
+        placeholder="为 ${escapeHtml(agentName)} 设置额外的 System Prompt（可选）"
+      >${escapeHtml(existingValues[agentId] || "")}</textarea>
+    `;
+    container.append(box);
+  });
 }
 
 function readSpeakerAssignments() {
