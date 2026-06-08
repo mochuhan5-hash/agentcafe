@@ -298,8 +298,7 @@ def carry_over_packet_prompt(
         f'  "to_table": "{to_table}",\n'
         f'  "after_round": {after_round + 1},\n'
         '  "agent_generated_memory": {\n'
-        '    "skill_lens": "这个 agent 使用了什么 skill 或角色视角",\n'
-        '    "personal_insight": "基于该 agent 本轮发言生成的个人洞察（不要直接引用发言的原文，反思自己的发言，输出对自己观点的整理认知，要求50字以内）"\n'
+        '    "personal_insight": "基于该 agent 本轮发言生成的个人洞察（不要直接引用发言的原文，从设计视角反思自己的发言，输出对自己观点的整理认知，要求100字以内）"\n'
         '  }\n'
         "}"
     )
