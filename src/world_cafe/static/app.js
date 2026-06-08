@@ -1323,10 +1323,16 @@ function appendRotationRecord(metadata) {
   });
 }
 
+function isNearBottom(el, threshold = 60) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
+}
+
 function scrollTableToBottom(round) {
   const list = round.closest(".round-list");
   if (!list) return;
-  list.scrollTop = list.scrollHeight;
+  if (isNearBottom(list)) {
+    list.scrollTop = list.scrollHeight;
+  }
 }
 
 function renderHarvest(markdown) {
@@ -1811,8 +1817,9 @@ function addMessage(kind, content) {
   } else {
     message.textContent = content;
   }
+  const shouldScroll = isNearBottom(chatLog);
   chatLog.append(message);
-  chatLog.scrollTop = chatLog.scrollHeight;
+  if (shouldScroll) chatLog.scrollTop = chatLog.scrollHeight;
 }
 
 function formatQuestions(tables) {

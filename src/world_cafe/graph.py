@@ -11,7 +11,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send
 
 from world_cafe.formatting import emphasize_design_opportunities
-from world_cafe.llm import CafeLLM
+from world_cafe.llm import CafeLLM, OpenAICafeLLM
 from world_cafe.parsing import extract_bullets, extract_section, loads_jsonish_object, unique_append
 from world_cafe.profiles import build_default_agent_profiles, normalize_questions
 from world_cafe.prompts import (
@@ -35,6 +35,24 @@ from world_cafe.state import (
     WorldCafeState,
 )
 from world_cafe.trace import emit_stream_event, make_event
+
+
+def _harvest_llm(fallback: CafeLLM) -> CafeLLM:
+    """Return a dedicated LLM for harvest if HARVEST_* env vars are set, else fallback."""
+    import os
+    base_url = os.getenv("HARVEST_BASE_URL")
+    api_key = os.getenv("HARVEST_API_KEY")
+    if not base_url or not api_key:
+        return fallback
+    model = os.getenv("HARVEST_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-3.5-turbo"
+    return OpenAICafeLLM(
+        auth_token=api_key,
+        base_url=base_url,
+        model=model,
+        max_tokens=2000,
+        timeout=float(os.getenv("WORLD_CAFE_LLM_TIMEOUT", "180")),
+        concurrency=1,
+    )
 
 
 def create_initial_state(
@@ -144,7 +162,7 @@ def build_world_cafe_graph(
     builder.add_node("table_discussion", _make_table_discussion_node(llm, pause_check, note_checkpoint))
     builder.add_node("collect_round", _collect_round)
     builder.add_node("rotate_agents", _rotate_agents)
-    builder.add_node("global_harvest", _make_global_harvest_node(llm))
+    builder.add_node("global_harvest", _make_global_harvest_node(_harvest_llm(llm)))
 
     builder.add_edge(START, "setup")
     builder.add_edge("setup", "begin_round")
