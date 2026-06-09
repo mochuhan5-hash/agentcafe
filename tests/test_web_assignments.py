@@ -70,6 +70,24 @@ def test_static_app_sends_uploaded_background_to_facilitate_and_run() -> None:
     assert "backgroundFileInput.addEventListener" in js
 
 
+def test_static_app_accepts_common_text_brief_formats_and_harvest_notes() -> None:
+    root = Path(__file__).resolve().parents[1]
+    html = (root / "src/world_cafe/static/index.html").read_text(encoding="utf-8")
+    js = (root / "src/world_cafe/static/app.js").read_text(encoding="utf-8")
+
+    assert ".csv" in html
+    assert ".json" in html
+    assert ".yaml" in html
+    assert ".rtf" in html
+    assert "isSupportedBriefFile" in js
+    assert "请上传常见文本格式的 brief" in js
+    assert "getClosestNoteSource" in js
+    assert "harvestContent" in js
+    assert "sourceType" in js
+    assert '"harvest"' in js
+    assert "全局总结" in js
+
+
 def test_create_run_accepts_speeches_per_agent() -> None:
     body = RunCreateBody(
         tables=[TableQuestionBody(table_id="table_01", question="如何设计共创流程？")],
@@ -91,7 +109,7 @@ def test_static_app_exposes_speech_count_pause_and_notebook_controls() -> None:
     assert 'id="pauseBtn"' in html
     assert 'id="notebookList"' in html
     assert "设计机会洞察" in html
-    assert html.count("写下一个设计机会") == 4
+    assert html.count("写下结构化洞察") == 3
     assert "/static/app.js?v=" in html
     assert "/static/styles.css?v=" in html
     assert "speeches_per_agent: getSpeechesPerAgent()" in js
@@ -129,6 +147,25 @@ def test_static_app_exposes_speech_count_pause_and_notebook_controls() -> None:
     assert "未解张力" in js
     assert ".memory-round" in css
     assert ".memory-list" in css
+
+
+def test_static_app_tracks_all_note_highlights_and_downloads_activity_log() -> None:
+    root = Path(__file__).resolve().parents[1]
+    html = (root / "src/world_cafe/static/index.html").read_text(encoding="utf-8")
+    js = (root / "src/world_cafe/static/app.js").read_text(encoding="utf-8")
+
+    assert 'id="downloadActivityLogBtn"' in html
+    assert "下载日志" in html
+    assert "let userActivityLog = []" in js
+    assert "function recordUserAction" in js
+    assert "function downloadActivityLog" in js
+    assert "downloadActivityLogBtn.addEventListener" in js
+    assert "function getNotebookStats" in js
+    assert "highlightCount" in js
+    assert "highlight_count: entry.highlightCount" in js
+    assert '"note_highlighted"' in js
+    assert '"button_clicked"' in js
+    assert '"final_insights_updated"' in js
 
 
 @pytest.mark.asyncio
@@ -192,6 +229,7 @@ async def test_note_checkpoint_continue_endpoint_releases_waiting_session() -> N
                         speaker_id="agent_01",
                         speech_id="speech-1",
                         speech_target_id="mark-1",
+                        highlight_count=2,
                         created_at="10:00",
                     ),
                     UserNoteBody(
@@ -209,6 +247,7 @@ async def test_note_checkpoint_continue_endpoint_releases_waiting_session() -> N
         assert result["action"] == "switch_table"
         assert result["note_count"] == 1
         assert notes[0]["text"] == "用户显式标记的设计机会。"
+        assert notes[0]["highlight_count"] == 2
         assert session.submitted_notes["table_01:0"][0]["speaker_id"] == "agent_01"
         assert checkpoint_id not in session.note_checkpoint_meta
     finally:

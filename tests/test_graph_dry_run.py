@@ -418,7 +418,7 @@ def test_prompts_limit_agent_turns_and_global_harvest_length() -> None:
     assert "table_spec：" not in host_opening_user
     assert '"tablememory_usage_description"' in host_synthesis_user
     assert TABLEMEMORY_USAGE_DESCRIPTION in host_synthesis_user
-    assert "800字以内" in harvest_user
+    assert "1200字以内" in harvest_user
     speaking_index = harvest_user.index("所有 speaking agents 的历史对话原文")
     questions_index = harvest_user.index("所有桌子的讨论问题")
     tablememory_index = harvest_user.index("所有桌子的 tablememory")
@@ -434,9 +434,12 @@ def test_prompts_limit_agent_turns_and_global_harvest_length() -> None:
     assert "轮次摘要：" not in harvest_user
     assert "桌长记忆：" not in harvest_user
     assert "设计洞察：" in harvest_user
-    assert "### 用户主要需求的提取" in harvest_user
-    assert "### 设计问题的重新界定" in harvest_user
-    assert "### 不超过三个后续的设计方向" in harvest_user
+    assert "### 洞察 1" in harvest_user
+    assert "### 洞察 2" in harvest_user
+    assert "### 洞察 3" in harvest_user
+    assert "1、用户主要需求的提取" in harvest_user
+    assert "2、设计问题的重新界定" in harvest_user
+    assert "3、不超过三个后续的设计方向" in harvest_user
 
 
 def test_create_initial_state_fills_missing_agents_without_duplicate_ids() -> None:
@@ -688,6 +691,37 @@ def test_json_harvest_with_unknown_fields_uses_design_insight_template() -> None
     assert display.startswith("设计洞察")
     assert "Shared Patterns" not in display
     assert "1、用户主要需求的提取：暂无" in display
+
+
+def test_harvest_display_builds_three_structured_design_insights() -> None:
+    content = """
+{
+  "design_insights": [
+    {
+      "user_need": "夜间服务需要更低认知负担。",
+      "reframed_design_problem": "如何让夜间求助流程在压力状态下也能被理解。",
+      "design_direction": "建立夜间一键求助原型并观察误触率。"
+    },
+    {
+      "user_need": "照护者需要快速理解状态变化。",
+      "reframed_design_problem": "如何把零散状态信号转成可行动提醒。",
+      "design_direction": "测试照护者分级提醒看板。"
+    },
+    {
+      "user_need": "社区志愿者需要明确介入边界。",
+      "reframed_design_problem": "如何定义志愿支持与专业服务之间的交接点。",
+      "design_direction": "共创一套志愿者转介脚本。"
+    }
+  ]
+}
+"""
+    structured = _parse_structured_harvest(content)
+    display = _harvest_display_content(content, structured)
+
+    assert len(structured["design_insights"]) == 3
+    assert display.count("### 洞察") == 3
+    assert "夜间服务需要更低认知负担" in display
+    assert "共创一套志愿者转介脚本" in display
 
 
 def test_legacy_empty_harvest_template_is_not_displayed() -> None:

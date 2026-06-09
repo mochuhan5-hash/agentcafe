@@ -16,6 +16,7 @@ const speakersInput = document.querySelector("#speakersPerTable");
 const speechesInput = document.querySelector("#speechesPerAgent");
 const pauseBtn = document.querySelector("#pauseBtn");
 const addNoteBtn = document.querySelector("#addNoteBtn");
+const downloadActivityLogBtn = document.querySelector("#downloadActivityLogBtn");
 const notebookList = document.querySelector("#notebookList");
 const notebookCount = document.querySelector("#notebookCount");
 const noteCheckpointPanel = document.querySelector("#noteCheckpointPanel");
@@ -44,6 +45,7 @@ let isPaused = false;
 let seenEventKeys = new Set();
 let notebookEntries = [];
 let noteSequence = 0;
+let userActivityLog = [];
 let pendingNoteSelection = null;
 let pendingNoteCheckpoints = [];
 let activeNoteCheckpoint = null;
@@ -127,9 +129,8 @@ backgroundFileInput.addEventListener("change", async () => {
     clearBackground();
     return;
   }
-  const lowerName = file.name.toLowerCase();
-  if (!lowerName.endsWith(".md") && !lowerName.endsWith(".markdown") && !lowerName.endsWith(".txt")) {
-    addMessage("error", "请上传 .md 或 .markdown 背景材料。");
+  if (!isSupportedBriefFile(file)) {
+    addMessage("error", "请上传常见文本格式的 brief，例如 md、txt、csv、json、yaml、xml、html、rtf 或 log。");
     clearBackground();
     return;
   }
@@ -139,12 +140,62 @@ backgroundFileInput.addEventListener("change", async () => {
   clearBackgroundBtn.hidden = false;
 });
 
+const supportedBriefExtensions = new Set([
+  ".md",
+  ".markdown",
+  ".txt",
+  ".text",
+  ".csv",
+  ".tsv",
+  ".json",
+  ".jsonl",
+  ".yaml",
+  ".yml",
+  ".xml",
+  ".html",
+  ".htm",
+  ".rtf",
+  ".log",
+]);
+
+function isSupportedBriefFile(file) {
+  const lowerName = String(file?.name || "").toLowerCase();
+  const dotIndex = lowerName.lastIndexOf(".");
+  const extension = dotIndex >= 0 ? lowerName.slice(dotIndex) : "";
+  const mime = String(file?.type || "").toLowerCase();
+  return (
+    supportedBriefExtensions.has(extension) ||
+    mime.startsWith("text/") ||
+    ["application/json", "application/xml", "application/rtf"].includes(mime)
+  );
+}
+
 chooseBackgroundBtn?.addEventListener("click", () => backgroundFileInput.click());
 clearBackgroundBtn.addEventListener("click", clearBackground);
 pauseBtn.addEventListener("click", togglePause);
 addNoteBtn.addEventListener("mousedown", (event) => event.preventDefault());
 addNoteBtn.addEventListener("click", addSelectedNote);
 continueNotesBtn?.addEventListener("click", submitActiveNoteCheckpoint);
+downloadActivityLogBtn.addEventListener("click", downloadActivityLog);
+document.querySelectorAll(".opportunity-grid textarea").forEach((textarea, index) => {
+  textarea.addEventListener("change", () => {
+    recordUserAction("final_insights_updated", {
+      insight_index: index + 1,
+      content: textarea.value.trim(),
+      final_insights: getFinalInsightContents(),
+    });
+  });
+});
+
+document.addEventListener("click", (event) => {
+  const button = event.target.closest("button");
+  if (!button) return;
+  recordUserAction("button_clicked", {
+    button_id: button.id || "",
+    button_text: getButtonLabel(button),
+    disabled: button.disabled,
+  });
+});
 
 // Delegate clicks on agent elements to show details modal
 document.addEventListener("click", (event) => {
@@ -230,7 +281,7 @@ function closeAgentProfile() {
 
 document.addEventListener("selectionchange", () => {
   pendingNoteSelection = getSelectedDiscussionSelection();
-  addNoteBtn.disabled = !isNoteTakingActive() || !pendingNoteSelection;
+  addNoteBtn.disabled = !canAddNoteFromSelection(pendingNoteSelection);
 });
 
 async function init() {
@@ -1323,20 +1374,19 @@ function appendRotationRecord(metadata) {
   });
 }
 
-function isNearBottom(el, threshold = 60) {
-  return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
-}
-
 function scrollTableToBottom(round) {
   const list = round.closest(".round-list");
   if (!list) return;
-  if (isNearBottom(list)) {
-    list.scrollTop = list.scrollHeight;
-  }
+  list.scrollTop = list.scrollHeight;
 }
 
 function renderHarvest(markdown) {
   harvestContent.classList.remove("muted");
+  harvestContent.dataset.sourceType = "harvest";
+  harvestContent.dataset.tableId = "harvest";
+  harvestContent.dataset.roundIndex = Number.isFinite(Number(maxRounds)) ? String(maxRounds) : "";
+  harvestContent.dataset.speakerName = "全局总结";
+  harvestContent.dataset.speakerId = "harvest";
   harvestContent.innerHTML = renderMarkdownLite(markdown || "No harvest generated.");
 }
 
@@ -1350,6 +1400,7 @@ function resetRunView() {
   agentMemorySnapshots = {};
   notebookEntries = [];
   noteSequence = 0;
+  userActivityLog = [];
   pendingNoteSelection = null;
   pendingNoteCheckpoints = [];
   activeNoteCheckpoint = null;
@@ -1363,6 +1414,11 @@ function resetRunView() {
   document.querySelectorAll(".table-card").forEach(card => card.classList.remove("gated-pulse"));
   traceCount.textContent = "0 个事件";
   harvestContent.classList.add("muted");
+  harvestContent.removeAttribute("data-source-type");
+  harvestContent.removeAttribute("data-table-id");
+  harvestContent.removeAttribute("data-round-index");
+  harvestContent.removeAttribute("data-speaker-name");
+  harvestContent.removeAttribute("data-speaker-id");
   harvestContent.textContent = "等待讨论完成";
   tablesGrid.innerHTML = "";
   resetAgentRoleStatuses();
@@ -1496,7 +1552,7 @@ function refreshNoteTakingControls() {
   discussionPane.classList.toggle("paused", isNoteTakingActive());
   pauseBtn.disabled = !activeRun || Boolean(activeNoteCheckpoint);
   pauseBtn.textContent = isPaused ? "继续讨论" : "暂停标注";
-  addNoteBtn.disabled = !isNoteTakingActive() || !pendingNoteSelection;
+  addNoteBtn.disabled = !canAddNoteFromSelection(pendingNoteSelection);
   if (activeNoteCheckpoint) {
     renderActiveNoteCheckpoint();
   }
@@ -1603,16 +1659,17 @@ function hideNoteCheckpointPanel() {
 function renderActiveNoteCheckpoint() {
   if (!activeNoteCheckpoint || !noteCheckpointPanel) return;
   const notes = getNotesForCheckpoint(activeNoteCheckpoint);
+  const stats = getNotebookStats(notes);
   const roundLabel = Number(activeNoteCheckpoint.round_index) + 1;
   const queued = pendingNoteCheckpoints.length ? ` · 另有 ${pendingNoteCheckpoints.length} 桌等待换桌` : "";
   if (noteCheckpointTitle) {
     noteCheckpointTitle.textContent = `${activeNoteCheckpoint.table_id} · Round ${roundLabel} · 换桌前笔记`;
   }
   if (noteCheckpointDetail) {
-    noteCheckpointDetail.textContent = `请先完成本桌本轮的设计洞察/机会笔记，点击“换桌”后桌长才会结合笔记生成内在记忆、输出结束语，并进入换桌。将提交 ${notes.length} 条笔记${queued}。`;
+    noteCheckpointDetail.textContent = `请先完成本桌本轮的设计洞察/机会笔记，点击“换桌”后桌长才会结合笔记生成内在记忆、输出结束语，并进入换桌。将提交 ${stats.noteCount} 条笔记 / ${stats.highlightCount} 处高亮${queued}。`;
   }
   if (continueNotesBtn) {
-    continueNotesBtn.textContent = notes.length ? `提交 ${notes.length} 条笔记并换桌` : "无笔记，直接换桌";
+    continueNotesBtn.textContent = notes.length ? `提交 ${stats.noteCount} 条笔记并换桌` : "无笔记，直接换桌";
   }
 }
 
@@ -1634,6 +1691,14 @@ async function submitActiveNoteCheckpoint() {
       status: "生成桌长记忆",
       detail: `${checkpoint.table_id} 桌长正在结合用户标注笔记更新内在记忆，然后输出本轮结束语。`,
       meta: `${notes.length} notes · switch table`,
+    });
+    recordUserAction("notes_submitted", {
+      checkpoint_id: checkpoint.checkpoint_id,
+      table_id: checkpoint.table_id,
+      round_index: Number(checkpoint.round_index),
+      note_count: notes.length,
+      highlight_count: notes.reduce((count, note) => count + (Number(note.highlight_count) || 0), 0),
+      notes,
     });
     finishNoteCheckpoint(checkpoint.checkpoint_id);
   } catch (error) {
@@ -1661,6 +1726,7 @@ function noteToPayload(entry) {
     speaker_id: entry.speakerId,
     speech_id: entry.speechId,
     speech_target_id: entry.speechTargetId,
+    highlight_count: entry.highlightCount,
     created_at: entry.createdAt,
   };
 }
@@ -1675,12 +1741,14 @@ function getSelectedDiscussionSelection() {
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
   const text = selection.toString().trim();
   if (!text) return null;
-  const anchorSpeech = getClosestSpeech(selection.anchorNode);
-  const focusSpeech = getClosestSpeech(selection.focusNode);
-  if (!anchorSpeech || anchorSpeech !== focusSpeech) return null;
+  const anchorSource = getClosestNoteSource(selection.anchorNode);
+  const focusSource = getClosestNoteSource(selection.focusNode);
+  if (!anchorSource || anchorSource !== focusSource) return null;
   return {
     text,
-    speech: anchorSpeech,
+    source: anchorSource,
+    speech: anchorSource,
+    sourceType: anchorSource.dataset.sourceType || "speech",
     range: selection.getRangeAt(0).cloneRange(),
   };
 }
@@ -1691,12 +1759,29 @@ function getClosestSpeech(node) {
   return element?.closest(".speech") || null;
 }
 
+function getClosestNoteSource(node) {
+  if (!node) return null;
+  const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+  return element?.closest(".speech, #harvestContent") || null;
+}
+
+function canAddNoteFromSelection(selectionInfo) {
+  if (!selectionInfo) return false;
+  if (selectionInfo.sourceType === "harvest") return !harvestContent.classList.contains("muted");
+  return isNoteTakingActive();
+}
+
 function addSelectedNote() {
   const selectionInfo = getSelectedDiscussionSelection() || pendingNoteSelection;
-  if (!selectionInfo) return;
-  const { text, speech, range } = selectionInfo;
+  if (!canAddNoteFromSelection(selectionInfo)) return;
+  const { text, source, sourceType, range } = selectionInfo;
+  const speech = source;
   const noteId = `note-${++noteSequence}`;
   const highlighted = highlightSelectionRange(range, noteId);
+  if (!highlighted?.highlightCount) {
+    addMessage("error", "没有成功标记选中的文字，请重新选择后再加入笔记。");
+    return;
+  }
   const roundBlock = speech.closest("[data-round-index]");
   const tableCard = speech.closest("[data-table-id]");
   const tableId = speech.dataset.tableId || tableCard?.dataset.tableId || activeNoteCheckpoint?.table_id || "";
@@ -1709,16 +1794,29 @@ function addSelectedNote() {
     {
       id: noteId,
       text,
-      speakerName: speech.dataset.speakerName || "Unknown speaker",
+      sourceType,
+      speakerName: speech.dataset.speakerName || (sourceType === "harvest" ? "全局总结" : "Unknown speaker"),
       speakerId: speech.dataset.speakerId || "",
       tableId,
       roundIndex,
       speechId: speech.id,
-      speechTargetId: highlighted?.id || speech.id,
+      speechTargetId: highlighted.element?.id || speech.id,
+      highlightCount: highlighted.highlightCount,
       round: Number.isFinite(roundIndex) ? roundIndex + 1 : currentRound,
       createdAt: new Date().toLocaleTimeString(),
     },
   ];
+  recordUserAction("note_highlighted", {
+    note_id: noteId,
+    text,
+    sourceType: sourceType || "speech",
+    table_id: tableId,
+    round_index: Number.isFinite(roundIndex) ? roundIndex : null,
+    speaker_name: speech.dataset.speakerName || (sourceType === "harvest" ? "全局总结" : "Unknown speaker"),
+    speaker_id: speech.dataset.speakerId || "",
+    speech_id: speech.id,
+    highlight_count: highlighted.highlightCount,
+  });
   window.getSelection()?.removeAllRanges();
   pendingNoteSelection = null;
   renderNotebook();
@@ -1727,7 +1825,8 @@ function addSelectedNote() {
 }
 
 function renderNotebook() {
-  notebookCount.textContent = `已记录 ${notebookEntries.length} 条笔记`;
+  const stats = getNotebookStats();
+  notebookCount.textContent = `已记录 ${stats.noteCount} 条笔记 · ${stats.highlightCount} 处高亮`;
   notebookList.innerHTML = "";
   notebookEntries.forEach((entry, index) => {
     const item = document.createElement("button");
@@ -1735,7 +1834,7 @@ function renderNotebook() {
     item.className = "notebook-entry";
     item.dataset.noteTarget = entry.id;
     item.innerHTML = `
-      <div class="notebook-entry-meta">#${index + 1} · ${escapeHtml(entry.tableId || "?")} · ${escapeHtml(entry.speakerName)} · Round ${entry.round || "?"} · ${escapeHtml(entry.createdAt)}</div>
+      <div class="notebook-entry-meta">#${index + 1} · ${escapeHtml(entry.tableId || "?")} · ${escapeHtml(entry.speakerName)} · Round ${entry.round || "?"} · ${entry.highlightCount || 0} 处高亮 · ${escapeHtml(entry.createdAt)}</div>
       <p>${escapeHtml(entry.text)}</p>
     `;
     item.addEventListener("click", () => jumpToNote(entry));
@@ -1744,22 +1843,23 @@ function renderNotebook() {
 }
 
 function highlightSelectionRange(range, noteId) {
-  const speech = getClosestSpeech(range.commonAncestorContainer);
-  if (!speech) return null;
+  const noteSource = getClosestNoteSource(range.commonAncestorContainer);
+  if (!noteSource) return null;
   const simpleMark = document.createElement("mark");
   simpleMark.className = "user-note-highlight";
   simpleMark.dataset.noteId = noteId;
   try {
     simpleMark.append(range.extractContents());
     range.insertNode(simpleMark);
-    return simpleMark;
+    return { element: simpleMark, highlightCount: 1 };
   } catch {
     simpleMark.remove();
   }
 
   const textNodes = [];
+  const marks = [];
   const walker = document.createTreeWalker(
-    speech,
+    noteSource,
     NodeFilter.SHOW_TEXT,
     {
       acceptNode(node) {
@@ -1787,8 +1887,27 @@ function highlightSelectionRange(range, noteId) {
     mark.dataset.noteId = noteId;
     selected.parentNode.insertBefore(mark, after);
     mark.append(selected);
+    marks.push(mark);
   });
-  return document.querySelector(`[data-note-id="${noteId}"]`);
+  return marks.length ? { element: marks[0], highlightCount: marks.length } : null;
+}
+
+function getNotebookStats(entries = notebookEntries) {
+  return entries.reduce(
+    (stats, entry) => {
+      const storedCount = Number(entry.highlightCount) || 0;
+      const liveCount = countNoteHighlightElements(entry.id);
+      stats.noteCount += 1;
+      stats.highlightCount += Math.max(storedCount, liveCount);
+      return stats;
+    },
+    { noteCount: 0, highlightCount: 0 },
+  );
+}
+
+function countNoteHighlightElements(noteId) {
+  if (!noteId) return 0;
+  return document.querySelectorAll(`[data-note-id="${noteId}"]`).length;
 }
 
 function jumpToNote(entry) {
@@ -1817,9 +1936,97 @@ function addMessage(kind, content) {
   } else {
     message.textContent = content;
   }
-  const shouldScroll = isNearBottom(chatLog);
   chatLog.append(message);
-  if (shouldScroll) chatLog.scrollTop = chatLog.scrollHeight;
+  chatLog.scrollTop = chatLog.scrollHeight;
+}
+
+function recordUserAction(type, details = {}) {
+  userActivityLog = [
+    ...userActivityLog,
+    {
+      type,
+      timestamp: new Date().toISOString(),
+      run_id: activeRun?.run_id || "",
+      current_round: getCurrentActivityRound(),
+      active_checkpoint: activeNoteCheckpoint
+        ? {
+            checkpoint_id: activeNoteCheckpoint.checkpoint_id,
+            table_id: activeNoteCheckpoint.table_id,
+            round_index: Number(activeNoteCheckpoint.round_index),
+          }
+        : null,
+      details,
+    },
+  ];
+}
+
+function getCurrentActivityRound() {
+  if (activeNoteCheckpoint) return Number(activeNoteCheckpoint.round_index) + 1;
+  return currentRound || 0;
+}
+
+function getButtonLabel(button) {
+  return (button.innerText || button.textContent || button.getAttribute("aria-label") || button.id || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getFinalInsightContents() {
+  return [...document.querySelectorAll(".opportunity-grid label")].map((label, index) => ({
+    index: index + 1,
+    label: label.querySelector("span")?.textContent?.trim() || `机会 ${index + 1}`,
+    content: label.querySelector("textarea")?.value.trim() || "",
+  }));
+}
+
+function downloadActivityLog() {
+  recordUserAction("activity_log_downloaded", {
+    event_count_before_download: userActivityLog.length,
+  });
+  const payload = {
+    generated_at: new Date().toISOString(),
+    run: activeRun
+      ? {
+          run_id: activeRun.run_id,
+          status: activeRun.status,
+          table_count: activeRun.table_count,
+          rounds: activeRun.rounds,
+          speakers_per_table: activeRun.speakers_per_table,
+          speeches_per_agent: activeRun.speeches_per_agent,
+        }
+      : null,
+    notebook_stats: getNotebookStats(),
+    notes: notebookEntries.map(noteToLogEntry),
+    final_insights: getFinalInsightContents(),
+    activity_log: userActivityLog,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const runId = activeRun?.run_id || "no-run";
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  link.href = url;
+  link.download = `agent-cafe-user-log-${runId}-${stamp}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function noteToLogEntry(entry) {
+  return {
+    id: entry.id,
+    text: entry.text,
+    table_id: entry.tableId,
+    round_index: Number(entry.roundIndex),
+    round: entry.round,
+    speaker_name: entry.speakerName,
+    speaker_id: entry.speakerId,
+    speech_id: entry.speechId,
+    speech_target_id: entry.speechTargetId,
+    highlight_count: entry.highlightCount,
+    created_at: entry.createdAt,
+  };
 }
 
 function formatQuestions(tables) {

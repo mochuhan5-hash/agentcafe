@@ -11,7 +11,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.types import Send
 
 from world_cafe.formatting import emphasize_design_opportunities
-from world_cafe.llm import CafeLLM, OpenAICafeLLM
+from world_cafe.llm import CafeLLM
 from world_cafe.parsing import extract_bullets, extract_section, loads_jsonish_object, unique_append
 from world_cafe.profiles import build_default_agent_profiles, normalize_questions
 from world_cafe.prompts import (
@@ -35,24 +35,6 @@ from world_cafe.state import (
     WorldCafeState,
 )
 from world_cafe.trace import emit_stream_event, make_event
-
-
-def _harvest_llm(fallback: CafeLLM) -> CafeLLM:
-    """Return a dedicated LLM for harvest if HARVEST_* env vars are set, else fallback."""
-    import os
-    base_url = os.getenv("HARVEST_BASE_URL")
-    api_key = os.getenv("HARVEST_API_KEY")
-    if not base_url or not api_key:
-        return fallback
-    model = os.getenv("HARVEST_MODEL") or os.getenv("OPENAI_MODEL") or "gpt-3.5-turbo"
-    return OpenAICafeLLM(
-        auth_token=api_key,
-        base_url=base_url,
-        model=model,
-        max_tokens=2000,
-        timeout=float(os.getenv("WORLD_CAFE_LLM_TIMEOUT", "180")),
-        concurrency=1,
-    )
 
 
 def create_initial_state(
@@ -162,7 +144,7 @@ def build_world_cafe_graph(
     builder.add_node("table_discussion", _make_table_discussion_node(llm, pause_check, note_checkpoint))
     builder.add_node("collect_round", _collect_round)
     builder.add_node("rotate_agents", _rotate_agents)
-    builder.add_node("global_harvest", _make_global_harvest_node(_harvest_llm(llm)))
+    builder.add_node("global_harvest", _make_global_harvest_node(llm))
 
     builder.add_edge(START, "setup")
     builder.add_edge("setup", "begin_round")
@@ -667,7 +649,7 @@ def _parse_structured_harvest(content: str) -> dict[str, Any]:
         cross_table_tensions = _extract_legacy_harvest_items(content, "Cross-table Tensions")
         reframed_questions = _extract_legacy_harvest_items(content, "Reframed Questions")
         next_experiments = _extract_legacy_harvest_items(content, "Next Experiments")
-        return {
+        fallback_harvest = {
             "user_needs": _extract_design_insight_items(content, "1、用户主要需求的提取")
             or pattern_channel
             or weak_signal_channel,
@@ -686,6 +668,10 @@ def _parse_structured_harvest(content: str) -> dict[str, Any]:
             "reframed_design_questions": reframed_questions,
             "next_learning_experiments": next_experiments,
         }
+        return {
+            **fallback_harvest,
+            "design_insights": _design_insights_from_harvest(fallback_harvest),
+        }
     display = str(data.get("display_markdown") or data.get("markdown") or "")
     pattern_channel = data.get("pattern_channel") or data.get("shared_patterns") or data.get("cross_table_patterns") or []
     weak_signal_channel = data.get("weak_signal_channel") or data.get("weak_signals") or data.get("rare_but_promising_signals") or []
@@ -697,7 +683,7 @@ def _parse_structured_harvest(content: str) -> dict[str, Any]:
     tension_items = _coerce_items(cross_table_tensions) or _extract_legacy_harvest_items(display, "Cross-table Tensions")
     reframed_question_items = _coerce_items(reframed_questions) or _extract_legacy_harvest_items(display, "Reframed Questions")
     next_experiment_items = _coerce_items(next_experiments) or _extract_legacy_harvest_items(display, "Next Experiments")
-    return {
+    structured_harvest = {
         "user_needs": _coerce_items(
             data.get("user_needs")
             or data.get("primary_user_needs")
@@ -729,37 +715,142 @@ def _parse_structured_harvest(content: str) -> dict[str, Any]:
         "next_learning_experiments": next_experiments or next_experiment_items,
         "display_markdown": display,
     }
+    return {
+        **structured_harvest,
+        "design_insights": _design_insights_from_harvest(
+            {
+                **structured_harvest,
+                "design_insights": data.get("design_insights")
+                or data.get("structured_design_insights")
+                or data.get("insights"),
+            }
+        ),
+    }
 
 
 def _harvest_display_content(content: str, structured_harvest: dict[str, Any]) -> str:
     display = str(structured_harvest.get("display_markdown") or "").strip()
-    if display and _is_design_insight_markdown(display):
+    if display and _is_three_design_insight_markdown(display):
         return emphasize_design_opportunities(_limit_harvest_display(display))
     try:
         loads_jsonish_object(content)
     except Exception:
-        if _is_design_insight_markdown(content):
+        if _is_three_design_insight_markdown(content):
             return emphasize_design_opportunities(_limit_harvest_display(content))
         return emphasize_design_opportunities(_limit_harvest_display(_format_structured_harvest_markdown(structured_harvest)))
     return emphasize_design_opportunities(_limit_harvest_display(_format_structured_harvest_markdown(structured_harvest)))
 
 
 def _format_structured_harvest_markdown(harvest: dict[str, Any]) -> str:
-    direction_items = _limit_items(_coerce_items(harvest.get("next_design_directions")), 3)
-    direction_lines = [f"- {item}" for item in direction_items] or ["- 暂无"]
-    return "\n".join(
-        [
-            "设计洞察：",
-            f"1、用户主要需求的提取：{_inline_items(harvest.get('user_needs'))}",
-            f"2、设计问题的重新界定：{_coerce_text(harvest.get('reframed_design_problem')) or '暂无'}",
-            "3、不超过三个后续的设计方向：",
-            *direction_lines,
-        ]
-    )
+    lines = ["设计洞察："]
+    for index, insight in enumerate(_design_insights_from_harvest(harvest), start=1):
+        lines.extend(
+            [
+                "",
+                f"### 洞察 {index}",
+                f"1、用户主要需求的提取：{_coerce_text(insight.get('user_need')) or '暂无'}",
+                f"2、设计问题的重新界定：{_coerce_text(insight.get('reframed_design_problem')) or '暂无'}",
+                f"3、不超过三个后续的设计方向：{_coerce_text(insight.get('design_direction')) or '暂无'}",
+            ]
+        )
+    return "\n".join(lines)
 
 
 def _is_design_insight_markdown(text: str) -> bool:
     return all(marker in text for marker in ("设计洞察", "用户主要需求", "设计问题", "设计方向"))
+
+
+def _is_three_design_insight_markdown(text: str) -> bool:
+    return _is_design_insight_markdown(text) and text.count("### 洞察") >= 3
+
+
+def _design_insights_from_harvest(harvest: dict[str, Any]) -> list[dict[str, str]]:
+    explicit = _normalize_design_insight_list(harvest.get("design_insights"))
+    if explicit:
+        return _pad_design_insights(explicit)
+    needs = _coerce_items(harvest.get("user_needs"))
+    problem = _coerce_text(harvest.get("reframed_design_problem"))
+    directions = _limit_items(_coerce_items(harvest.get("next_design_directions")), 3)
+    insights: list[dict[str, str]] = []
+    for index in range(3):
+        insights.append(
+            {
+                "user_need": _pick_indexed_or_first(needs, index),
+                "reframed_design_problem": problem,
+                "design_direction": _pick_indexed_or_first(directions, index),
+            }
+        )
+    return _pad_design_insights(insights)
+
+
+def _normalize_design_insight_list(value: object) -> list[dict[str, str]]:
+    if not value:
+        return []
+    values = value if isinstance(value, list) else [value]
+    insights: list[dict[str, str]] = []
+    for item in values:
+        if isinstance(item, dict):
+            insights.append(
+                {
+                    "user_need": _first_text(
+                        item.get("user_need"),
+                        item.get("user_needs"),
+                        item.get("need"),
+                        item.get("用户主要需求的提取"),
+                    ),
+                    "reframed_design_problem": _first_text(
+                        item.get("reframed_design_problem"),
+                        item.get("design_problem_reframe"),
+                        item.get("problem"),
+                        item.get("设计问题的重新界定"),
+                    ),
+                    "design_direction": _first_text(
+                        item.get("design_direction"),
+                        item.get("next_design_direction"),
+                        item.get("direction"),
+                        item.get("后续的设计方向"),
+                    ),
+                }
+            )
+        else:
+            text = _coerce_text(item)
+            if text:
+                insights.append(
+                    {
+                        "user_need": text,
+                        "reframed_design_problem": "暂无",
+                        "design_direction": "暂无",
+                    }
+                )
+    return [insight for insight in insights if any(value != "暂无" and value for value in insight.values())]
+
+
+def _pad_design_insights(insights: list[dict[str, str]]) -> list[dict[str, str]]:
+    normalized = [
+        {
+            "user_need": _coerce_text(insight.get("user_need")) or "暂无",
+            "reframed_design_problem": _coerce_text(insight.get("reframed_design_problem")) or "暂无",
+            "design_direction": _coerce_text(insight.get("design_direction")) or "暂无",
+        }
+        for insight in insights[:3]
+    ]
+    while len(normalized) < 3:
+        normalized.append(
+            {
+                "user_need": "暂无",
+                "reframed_design_problem": "暂无",
+                "design_direction": "暂无",
+            }
+        )
+    return normalized
+
+
+def _pick_indexed_or_first(items: list[str], index: int) -> str:
+    if not items:
+        return "暂无"
+    if index < len(items):
+        return items[index]
+    return items[0]
 
 
 def _extract_legacy_harvest_items(content: str, heading: str) -> list[str]:
@@ -858,7 +949,7 @@ def _first_text(*values: object) -> str:
     return ""
 
 
-def _limit_harvest_display(text: str, limit: int = 500) -> str:
+def _limit_harvest_display(text: str, limit: int = 1200) -> str:
     display = text.strip()
     if len(display) <= limit:
         return display

@@ -39,27 +39,13 @@ async def facilitate_request(
     if table_count < 1:
         raise ValueError("table_count must be at least 1")
     system = (
-        "你是世界咖啡流程中的 facilitator agent。你的职责分两步：\n"
-        "1. Expert-skill routing：根据用户问题和背景材料，判断哪些专家视角（如服务设计、行为心理、系统工程、利益相关者分析、政策制度等）最能提升讨论质量，为每张桌分配一个 expert_skill。\n"
-        "2. 问题生成：基于专家视角生成每张小桌的讨论问句。\n\n"
-        "问题生成标准——每个问句必须同时满足：\n"
-        "- 有证据支撑（能从背景材料中找到对应现象或张力）\n"
-        "- 开放式（不能用是/否回答）\n"
-        "- 具有生成性（能引发新观察，而非确认已知结论）\n"
-        "- 不带诱导性（不暗示特定答案方向）\n"
-        "- 能 travel well（适合跨桌迁移和交叉授粉）\n"
-        "- 不按功能模块机械拆分\n"
-        "- 不过早提出解决方案\n\n"
-        "质量校准透镜（用于检查问题组合的互补性，优先级低于 expert-skill routing）：\n"
-        "用户旅程 / 利益相关者张力 / 根因机制 / 边缘案例 / 未来场景 / 问题重构\n\n"
+        "你是世界咖啡流程中的 facilitator agent。你只负责为每张小桌生成一个初始讨论问句，不同的桌子讨论不同的设计问题。"
         "每张桌只能有一个问句；问句必须简短、开放、中立、可迁移，不要带解释、细节、引导语或解决方案。"
         "最终 tables 数量必须严格等于 table_count；只输出 JSON，不要输出 Markdown。"
     )
     examples = ",\n".join(
         (
             f'    {{"table_id": "table_{index:02d}", '
-            '"expert_skill": "专家视角名称", '
-            '"expert_rationale": "为何选此专家视角（一句话）", '
             '"question": "一个简短问句？"}'
         )
         for index in range(1, table_count + 1)
@@ -68,13 +54,9 @@ async def facilitate_request(
         "用户请求：\n"
         f"{user_request}\n\n"
         f"{_format_background(background_context, background_filename)}"
-        f"本次必须生成 table_count={table_count} 张小桌问句，tables 数组长度必须等于 {table_count}。\n\n"
-        "流程：\n"
-        "1. 先阅读用户问题和背景材料，识别最相关的专家视角（expert_skill），每桌分配一个不同的专家视角。\n"
-        "2. 基于该专家视角生成问句，确保问句满足上述所有标准。\n"
-        "3. 用透镜框架检查问句组合是否覆盖不同维度、互补且可迁移。\n\n"
+        f"本次必须生成 table_count={table_count} 张小桌问句，tables 数组长度必须等于 {table_count}。\n"
         "每个 question 必须只有一个问句，建议 8-24 个汉字，不要包含冒号、解释、分点、背景信息或引导语。\n"
-        "每个 question 之间要有较大的差距，要引发不同（异质）维度的设计思考。\n"
+        "每个 question 之间要有较大的差距，要引发不同（异质）维度的设计思考\n"
         "请严格输出如下 JSON 结构：\n"
         "{\n"
         '  "tables": [\n'

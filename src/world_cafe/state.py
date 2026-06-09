@@ -46,6 +46,7 @@ class UserNote(TypedDict, total=False):
     speaker_id: str
     speech_id: str
     speech_target_id: str
+    highlight_count: int
     created_at: str
 
 

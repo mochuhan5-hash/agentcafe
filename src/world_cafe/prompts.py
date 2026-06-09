@@ -298,7 +298,8 @@ def carry_over_packet_prompt(
         f'  "to_table": "{to_table}",\n'
         f'  "after_round": {after_round + 1},\n'
         '  "agent_generated_memory": {\n'
-        '    "personal_insight": "基于该 agent 本轮发言生成的个人洞察（不要直接引用发言的原文，从设计视角反思自己的发言，输出对自己观点的整理认知，要求100字以内）"\n'
+        '    "skill_lens": "这个 agent 使用了什么 skill 或角色视角",\n'
+        '    "personal_insight": "基于该 agent 本轮发言生成的个人洞察（不要直接引用发言的原文，反思自己的发言，输出对自己观点的整理认知，要求50字以内）"\n'
         '  }\n'
         "}"
     )
@@ -310,9 +311,10 @@ def global_harvest_prompt(table_memories: dict[str, TableMemory], table_round_ou
         "你负责 World Cafe 的全局 harvest。你不是 summary merger。"
         "你必须直接阅读 speaking agents 的历史对话原文，提取用户主要需求，重新界定设计问题，并给出后续设计方向。"
         "tablememory或其他二次整理内容仅作你的表述参考，不要当作 harvest 的主要输入。"
-        "后续设计方向最多三个，必须可继续研究、验证或推进设计。"
+        "最终必须生成三条结构化设计洞察，每条都包含用户需求、设计问题重新界定、后续设计方向。"
+        "每条后续设计方向必须可继续研究、验证或推进设计。"
         "内部可以使用 JSON 组织分析，但给用户展示的 display_markdown 必须自然可读，不要暴露内部字段解释。"
-        "display_markdown 必须控制在800字以内，并严格使用用户指定的中文三段式格式。"
+        "display_markdown 必须控制在1200字以内，并严格使用用户指定的中文三条洞察格式。"
         "如果展示内容中出现设计机会、机会假设或类似表达，请把相关词组或句子加粗。"
     )
     table_contexts = []
@@ -333,16 +335,23 @@ def global_harvest_prompt(table_memories: dict[str, TableMemory], table_round_ou
         f"{tablememory_text}\n\n"
         "以下是用户每轮标记的笔记，用于校准用户关注的洞察、张力和机会线索：\n\n"
         f"{user_note_history}\n\n"
-        "请优先输出 JSON，并包含字段 user_needs、reframed_design_problem、next_design_directions、display_markdown。\n"
-        "display_markdown 必须800字以内，可直接给用户看，并严格使用以下格式：\n"
+        "请优先输出 JSON，并包含字段 design_insights、user_needs、reframed_design_problem、next_design_directions、display_markdown。\n"
+        "design_insights 必须正好三条，每条包含 user_need、reframed_design_problem、design_direction。\n"
+        "display_markdown 必须1200字以内，可直接给用户看，并严格使用以下格式：\n"
         "设计洞察：\n"
-        "### 用户主要需求的提取：（参考每一轮的洞察或共识）\n"
-        "### 设计问题的重新界定：（参考每一轮的转变）\n"
-        "### 不超过三个后续的设计方向：\n"
-        "- ...\n"
-        "- ...\n"
-        "- ...\n"
-        "第三部分最多输出三个方向。如果无法输出 JSON，则直接输出同样结构的自然 Markdown。"
+        "### 洞察 1\n"
+        "1、用户主要需求的提取：...\n"
+        "2、设计问题的重新界定：...\n"
+        "3、不超过三个后续的设计方向：...\n\n"
+        "### 洞察 2\n"
+        "1、用户主要需求的提取：...\n"
+        "2、设计问题的重新界定：...\n"
+        "3、不超过三个后续的设计方向：...\n\n"
+        "### 洞察 3\n"
+        "1、用户主要需求的提取：...\n"
+        "2、设计问题的重新界定：...\n"
+        "3、不超过三个后续的设计方向：...\n"
+        "如果无法输出 JSON，则直接输出同样结构的自然 Markdown。"
     )
     return system, user
 

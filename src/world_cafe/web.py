@@ -72,6 +72,7 @@ class UserNoteBody(BaseModel):
     speaker_id: str = ""
     speech_id: str = ""
     speech_target_id: str = ""
+    highlight_count: int = 0
     created_at: str = ""
 
 
@@ -227,7 +228,7 @@ async def agents(count: int = 32, agents_file: str | None = None) -> dict[str, A
 async def facilitate(body: FacilitateBody) -> dict[str, Any]:
     try:
         timeout = _facilitation_timeout()
-        llm = _build_harvest_llm(temperature=0.25, max_tokens=500, timeout=timeout)
+        llm = _build_llm(temperature=0.25, max_tokens=500, timeout=timeout)
         return await asyncio.wait_for(
             facilitate_request(
                 llm,
@@ -516,6 +517,7 @@ def _normalize_user_notes(body: NoteCheckpointContinueBody) -> list[UserNote]:
                 "speaker_id": note.speaker_id,
                 "speech_id": note.speech_id,
                 "speech_target_id": note.speech_target_id,
+                "highlight_count": note.highlight_count,
                 "created_at": note.created_at,
             }
         )
@@ -549,24 +551,6 @@ def _facilitation_timeout() -> float:
 
 def _build_llm(*, temperature: float, max_tokens: int, timeout: float | None = None) -> OpenAICafeLLM:
     return OpenAICafeLLM.from_env(temperature=temperature, max_tokens=max_tokens, timeout=timeout)
-
-
-def _build_harvest_llm(*, temperature: float, max_tokens: int, timeout: float | None = None) -> OpenAICafeLLM:
-    """Use HARVEST_* env vars if set, otherwise fall back to default."""
-    base_url = os.getenv("HARVEST_BASE_URL")
-    api_key = os.getenv("HARVEST_API_KEY")
-    if base_url and api_key:
-        model = os.getenv("HARVEST_MODEL") or model_from_env()
-        return OpenAICafeLLM(
-            auth_token=api_key,
-            base_url=base_url,
-            model=model,
-            temperature=temperature,
-            max_tokens=max_tokens,
-            timeout=timeout if timeout is not None else float(os.getenv("WORLD_CAFE_LLM_TIMEOUT", "180")),
-            concurrency=1,
-        )
-    return _build_llm(temperature=temperature, max_tokens=max_tokens, timeout=timeout)
 
 
 def _get_session(run_id: str) -> RunSession:
