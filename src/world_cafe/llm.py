@@ -164,7 +164,7 @@ class OpenAICafeLLM:
         max_tokens: int = 1600,
         timeout: float = 120.0,
         concurrency: int = 3,
-        retries: int = 1,
+        retries: int = 2,
     ) -> None:
         tokens = _split_auth_tokens(auth_token, *(auth_tokens or []))
         if not tokens:
@@ -197,7 +197,7 @@ class OpenAICafeLLM:
             max_tokens=max_tokens,
             timeout=timeout if timeout is not None else float(os.getenv("WORLD_CAFE_LLM_TIMEOUT", "180")),
             concurrency=int(os.getenv("WORLD_CAFE_LLM_CONCURRENCY", "3")),
-            retries=int(os.getenv("WORLD_CAFE_LLM_RETRIES", "1")),
+            retries=int(os.getenv("WORLD_CAFE_LLM_RETRIES", "2")),
         )
 
     async def agenerate(self, system: str, user: str) -> str:
@@ -239,6 +239,21 @@ class OpenAICafeLLM:
                     payload,
                     headers,
                 )
+                if response.status_code in (401, 403, 429, 500, 502, 503):
+                    # Try next API key on auth/rate/server errors
+                    if len(self.auth_tokens) > 1 and attempt < self.retries:
+                        next_token = await self._next_auth_token()
+                        headers = {**headers, "authorization": f"Bearer {next_token}"}
+                        last_error = RuntimeError(
+                            f"AI API request failed with HTTP {response.status_code}, "
+                            f"retrying with next key (attempt {attempt + 1}/{self.retries + 1})"
+                        )
+                        await asyncio.sleep(1.5 * (attempt + 1))
+                        continue
+                    raise RuntimeError(
+                        "AI API request failed "
+                        f"with HTTP {response.status_code}: {response.text[:500]}"
+                    )
                 if response.status_code >= 400:
                     raise RuntimeError(
                         "AI API request failed "
@@ -253,6 +268,9 @@ class OpenAICafeLLM:
             except httpx.HTTPError as exc:
                 last_error = RuntimeError(f"AI API request failed: {exc!r}")
             if attempt < self.retries:
+                if len(self.auth_tokens) > 1:
+                    next_token = await self._next_auth_token()
+                    headers = {**headers, "authorization": f"Bearer {next_token}"}
                 await asyncio.sleep(1.5 * (attempt + 1))
         if last_error is None:
             raise RuntimeError("AI API request failed for an unknown reason")

@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/styles.css?v=20260608-brief-harvest-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260609-fix-8" />
   </head>
   <body>
     <div class="app-shell mode-config">
@@ -55,11 +55,11 @@
               <div class="settings-panel" aria-label="流程设置">
                 <label>
                   <span>桌数</span>
-                  <input id="tableCount" type="number" min="1" max="8" value="4" />
+                  <input id="tableCount" type="number" min="1" max="8" value="3" />
                 </label>
                 <label>
                   <span>每桌发言人数</span>
-                  <input id="speakersPerTable" type="number" min="1" max="8" value="3" />
+                  <input id="speakersPerTable" type="number" min="1" max="8" value="2" />
                 </label>
                 <label>
                   <span>每人发言次数</span>
@@ -75,9 +75,9 @@
                       <polyline points="17 8 12 3 7 8" />
                       <line x1="12" y1="3" x2="12" y2="15" />
                     </svg>
-                    <span>Brief / 背景材料（常见文本格式，可选）</span>
+                    <span>背景材料（Markdown，可选）</span>
                   </label>
-                  <input id="backgroundFile" type="file" accept=".md,.markdown,.txt,.text,.csv,.tsv,.json,.jsonl,.yaml,.yml,.xml,.html,.htm,.rtf,.log,text/*,application/json,application/xml,application/rtf,text/rtf" />
+                  <input id="backgroundFile" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" />
                   <div class="background-meta">
                     <span id="backgroundSummary">未上传背景材料</span>
                     <button type="button" class="secondary" id="chooseBackgroundBtn">选择文件</button>
@@ -126,51 +126,49 @@
           </div>
           <div class="question-editor" id="questionEditor" hidden></div>
           <div class="discussion-layout">
-            <div class="discussion-main">
               <div class="tables-grid" id="tablesGrid"></div>
-            </div>
-            <aside class="notebook-panel" aria-label="标注笔记本">
-              <div class="notebook-header">
-                <h2>设计笔记本</h2>
-                <span id="notebookCount" class="badge">0 条笔记</span>
-              </div>
-              <p class="notebook-hint">暂停后在 agent 原文中划选文字，点击“加入笔记”进行标注。</p>
-              <div id="noteCheckpointPanel" class="note-checkpoint-panel" hidden>
-                <strong id="noteCheckpointTitle">完成本桌笔记后换桌</strong>
-                <p id="noteCheckpointDetail">请先完成本桌本轮的设计洞察/机会笔记，点击“换桌”后桌长才会生成本轮记忆。</p>
-                <button type="button" id="continueNotesBtn">换桌</button>
-              </div>
-              <div class="notebook-actions">
-                <button type="button" class="secondary" id="addNoteBtn" disabled>加入笔记</button>
-                <button type="button" class="secondary" id="downloadActivityLogBtn">下载日志</button>
-              </div>
-              <div id="notebookList" class="notebook-list"></div>
-            </aside>
           </div>
         </section>
       </main>
 
-      <section class="harvest-band" aria-label="全局 harvest">
-        <div class="harvest-header">
-          <h2>全局成果收获</h2>
-          <span id="traceCount" class="badge">0 个事件</span>
+      <section class="bottom-panel" id="bottomPanel" aria-label="底部面板">
+        <div class="bottom-panel-tabs">
+          <button type="button" class="bottom-tab active" data-tab="notebook">
+            <span>📒</span> 设计笔记本
+            <span id="notebookCount" class="badge">0</span>
+          </button>
+          <button type="button" class="bottom-tab" data-tab="harvest">
+            <span>🌾</span> 全局成果收获
+            <span id="traceCount" class="badge">0</span>
+          </button>
+          <button type="button" class="bottom-tab" data-tab="opportunities">
+            <span>💡</span> 最终提交
+          </button>
+          <button type="button" class="bottom-panel-toggle" id="bottomPanelToggle">▲</button>
         </div>
-        <div id="harvestContent" class="markdown-lite muted">等待讨论完成</div>
-        <div class="design-opportunities" aria-label="设计机会洞察">
-          <h3>结构化设计洞察</h3>
-          <div class="opportunity-grid">
-            <label>
-              <span>洞察 1</span>
-              <textarea rows="3" placeholder="写下结构化洞察：用户需求 / 问题重构 / 设计方向..."></textarea>
-            </label>
-            <label>
-              <span>洞察 2</span>
-              <textarea rows="3" placeholder="写下结构化洞察：用户需求 / 问题重构 / 设计方向..."></textarea>
-            </label>
-            <label>
-              <span>洞察 3</span>
-              <textarea rows="3" placeholder="写下结构化洞察：用户需求 / 问题重构 / 设计方向..."></textarea>
-            </label>
+        <div class="bottom-panel-body">
+          <div class="bottom-tab-content active" data-tab="notebook">
+            <div id="noteCheckpointPanel" class="note-checkpoint-panel" hidden>
+              <strong id="noteCheckpointTitle">换桌前笔记</strong>
+              <button type="button" id="continueNotesBtn">换桌</button>
+            </div>
+            <div class="notebook-right">
+              <button type="button" class="secondary notebook-add-btn" id="addNoteBtn" disabled>+ 加入笔记</button>
+              <div id="notebookList" class="notebook-list"></div>
+            </div>
+          </div>
+          <div class="bottom-tab-content" data-tab="harvest">
+            <div id="harvestContent" class="markdown-lite muted">等待讨论完成</div>
+          </div>
+          <div class="bottom-tab-content" data-tab="opportunities">
+            <div class="opportunity-grid final-submit-grid">
+              <label><span>用户需求</span><textarea rows="4" data-final-insight="user_needs" placeholder="写下用户主要需求..."></textarea></label>
+              <label><span>设计问题</span><textarea rows="4" data-final-insight="design_problem" placeholder="写下重新界定后的设计问题..."></textarea></label>
+              <label><span>设计方向</span><textarea rows="4" data-final-insight="design_direction" placeholder="写下后续设计方向..."></textarea></label>
+            </div>
+            <div class="final-submit-actions">
+              <button type="button" class="secondary" id="downloadActivityLogBtn">下载日志</button>
+            </div>
           </div>
         </div>
       </section>
@@ -202,6 +200,6 @@
       </div>
     </div>
 
-    <script src="/static/app.js?v=20260608-brief-harvest-1" type="module"></script>
+    <script src="/static/app.js?v=20260609-fix-8" type="module"></script>
   </body>
 </html>

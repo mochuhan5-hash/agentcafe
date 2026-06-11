@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C /Users/mochuhan/agentcafe rev-parse --short HEAD)",
+      "Bash(git -C /Users/mochuhan/agentcafe rev-parse --short origin/feature/agentcafe-ui-refactor)",
+      "Bash(git -C /Users/mochuhan/agentcafe diff --name-only --diff-filter=U)",
+      "Bash(git -C /Users/mochuhan/agentcafe show origin/feature/agentcafe-ui-refactor:src/world_cafe/static/app.js)",
+      "Bash(git -C /Users/mochuhan/agentcafe show origin/feature/agentcafe-ui-refactor:src/world_cafe/static/index.html)",
+      "Bash(git -C /Users/mochuhan/agentcafe grep -n \"导出结果\\\\|下载系统日志\\\\|下载日志\\\\|downloadActivityLog\\\\|exportResult\\\\|final_insights\\\\|activity_log\" origin/feature/agentcafe-ui-refactor -- src tests)",
+      "Bash(xxd)",
+      "Bash(grep -n \"$\\(printf '\\\\xe2\\\\x80\\\\x9c'\\)\\\\|$\\(printf '\\\\xe2\\\\x80\\\\x9d'\\)\" /Users/mochuhan/agentcafe/src/world_cafe/static/app.js)",
+      "Bash(python3 -m py_compile /Users/mochuhan/agentcafe/src/world_cafe/web.py)",
+      "Bash(break)",
+      "Bash(.venv/bin/python -c \"from world_cafe import graph, prompts, context, state, facilitator, report; print\\('All modules OK'\\)\")",
+      "Bash(xargs kill -9)",
+      "Bash(.venv/bin/python -m uvicorn world_cafe.web:app --host 0.0.0.0 --port 8000)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8000/static/index.html)",
+      "Bash(.venv/bin/python -c \"from world_cafe.prompts import global_harvest_prompt; print\\(type\\(global_harvest_prompt\\({}, []\\)\\)\\)\")",
+      "Bash(.venv/bin/python -c ' *)",
+      "Bash(git checkout *)"
+    ]
+  }
+}

@@ -78,24 +78,9 @@ class TableMemory(TypedDict, total=False):
     table_id: str
     question: str
     host_id: str
-    living_summary: str
-    key_insights: list[str]
-    open_questions: list[str]
-    tensions: list[str]
-    stable_patterns: list[str]
-    incomplete_or_weak_patterns: list[str]
-    contested_points: list[str]
-    blind_spots_or_ambiguities: list[str]
-    formatmemory: list[dict[str, Any]]
-    rounds: list[dict[str, Any]]
-    source_context_anchor: list[str]
-    cumulative_pattern_evolution: str
-    recurring_patterns_across_rounds: list[str]
-    emerging_or_fading_signals: list[str]
-    unresolved_tensions_over_time: list[str]
-    round_pattern_delta: str
-    next_round_question_seeds: list[str]
     tablememory_usage_description: str
+    formatmemory: list[dict[str, Any]]
+    next_round_question_seeds: list[str]
 
 
 class TableRoundOutput(TypedDict):
@@ -109,9 +94,6 @@ class TableRoundOutput(TypedDict):
     host_opening: str
     host_record_display: str
     synthesis: str
-    key_insights: list[str]
-    open_questions: list[str]
-    tensions: list[str]
     table_memory_update: dict[str, Any]
     carry_over_packets: list[CarryOverPacket]
     user_notes: list[UserNote]
