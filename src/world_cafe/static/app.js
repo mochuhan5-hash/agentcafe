@@ -1917,6 +1917,13 @@ function getUserFinalSubmission() {
   };
 }
 
+function getGlobalHarvestExport() {
+  return {
+    markdown: harvestContent?.innerHTML || "",
+    text: harvestContent?.innerText?.trim() || "",
+  };
+}
+
 function getNotebookStats() {
   const byTable = {};
   const byRound = {};
@@ -1993,11 +2000,13 @@ function getTableChatHistories() {
 function downloadActivityLog() {
   const userNotes = notebookEntries.map(noteToLogEntry);
   const finalSubmission = getUserFinalSubmission();
+  const globalHarvest = getGlobalHarvestExport();
   recordUserAction("activity_log_downloaded", {
     event_count_before_download: userActivityLog.length,
     user_note_count: userNotes.length,
     table_history_count: getTableChatHistories().reduce((total, table) => total + table.history.length, 0),
     final_submission_fields: finalSubmission.fields.length,
+    global_harvest_chars: globalHarvest.text.length,
   });
   const payload = {
     generated_at: new Date().toISOString(),
@@ -2006,6 +2015,7 @@ function downloadActivityLog() {
     user_notes: userNotes,
     notes: userNotes,
     table_chat_histories: getTableChatHistories(),
+    global_harvest: globalHarvest,
     user_final_submission: finalSubmission,
     final_insights: finalSubmission.fields,
     activity_log: userActivityLog,
