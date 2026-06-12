@@ -2010,6 +2010,11 @@ input[type="file"] {
   padding: 12px 24px;
 }
 
+.bottom-panel.expanded[data-active-tab="harvest"] .bottom-panel-body,
+.bottom-panel.expanded[data-active-tab="opportunities"] .bottom-panel-body {
+  height: 280px;
+}
+
 .bottom-tab-content {
   display: none;
 }

@@ -1013,6 +1013,7 @@ function appendHostOpening(metadata) {
     memorySnapshot: metadata.memory_snapshot,
     tone: "host",
   });
+  decorateHostNoteTarget(slot.querySelector(".host-opening"), metadata, "host_opening");
   scrollTableToBottom(round, shouldScroll);
   
   // Highlight host seat on map
@@ -1087,6 +1088,7 @@ function appendHostRecord(metadata) {
       tone: "host",
     })}
   `;
+  decorateHostNoteTarget(slot.querySelector(".host-record"), metadata, "host_record");
   scrollTableToBottom(round, shouldScroll);
   
   // Highlight host seat on map
@@ -1098,6 +1100,18 @@ function tableHostLabel(tableId) {
   const match = String(tableId || "").match(/(\d+)$/);
   const number = match ? String(Number(match[1])) : String(tableId || "?");
   return `tb${number}`;
+}
+
+function decorateHostNoteTarget(element, metadata, kind) {
+  if (!element) return;
+  const tableId = metadata.table_id || "";
+  const roundIndex = metadata.round_index ?? "";
+  const hostId = metadata.host_id || "";
+  element.id = `speech-${tableId}-${roundIndex}-${hostId}-${kind}`;
+  element.dataset.speakerName = tableHostLabel(tableId);
+  element.dataset.speakerId = hostId;
+  element.dataset.tableId = tableId;
+  element.dataset.roundIndex = roundIndex;
 }
 
 function renderAgentMessage({
@@ -1693,7 +1707,7 @@ function getSelectedDiscussionSelection() {
 function getClosestSpeech(node) {
   if (!node) return null;
   const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-  return element?.closest(".speech") || null;
+  return element?.closest(".speech, .host-opening, .host-record") || null;
 }
 
 function addSelectedNote() {
@@ -1891,6 +1905,18 @@ function getFinalInsightContents() {
   }));
 }
 
+function getUserFinalSubmission() {
+  const fields = getFinalInsightContents();
+  return {
+    submitted_at: new Date().toISOString(),
+    fields,
+    text: fields
+      .filter((field) => field.content)
+      .map((field) => `${field.label || field.key}: ${field.content}`)
+      .join("\n\n"),
+  };
+}
+
 function getNotebookStats() {
   const byTable = {};
   const byRound = {};
@@ -1934,16 +1960,54 @@ function noteToLogEntry(entry) {
   };
 }
 
+function getTableChatHistories() {
+  return [...tablesGrid.querySelectorAll(".table-card")].map((table) => {
+    const tableId = table.dataset.tableId || "";
+    const records = [...table.querySelectorAll(".host-opening, .speech, .host-record")].map((item) => {
+      const meta = item.querySelector(".message-meta");
+      return {
+        id: item.id || "",
+        table_id: item.dataset.tableId || tableId,
+        round_index: Number.isFinite(Number(item.dataset.roundIndex)) ? Number(item.dataset.roundIndex) : null,
+        round: Number.isFinite(Number(item.dataset.roundIndex)) ? Number(item.dataset.roundIndex) + 1 : null,
+        speaker_name: item.dataset.speakerName || meta?.querySelector("strong")?.textContent?.trim() || "",
+        speaker_id: item.dataset.speakerId || "",
+        role_label: meta?.querySelector("span")?.textContent?.trim() || "",
+        meta_label: meta?.querySelector("em")?.textContent?.trim() || "",
+        content: item.querySelector(".markdown-lite")?.innerText?.trim() || "",
+        kind: item.classList.contains("host-opening")
+          ? "host_opening"
+          : item.classList.contains("host-record")
+            ? "host_record"
+            : "agent_contribution",
+      };
+    });
+    return {
+      table_id: tableId,
+      table_question: table.dataset.tableQuestion || "",
+      history: records,
+    };
+  });
+}
+
 function downloadActivityLog() {
+  const userNotes = notebookEntries.map(noteToLogEntry);
+  const finalSubmission = getUserFinalSubmission();
   recordUserAction("activity_log_downloaded", {
     event_count_before_download: userActivityLog.length,
+    user_note_count: userNotes.length,
+    table_history_count: getTableChatHistories().reduce((total, table) => total + table.history.length, 0),
+    final_submission_fields: finalSubmission.fields.length,
   });
   const payload = {
     generated_at: new Date().toISOString(),
     run: getRunLogSummary(),
     notebook_stats: getNotebookStats(),
-    notes: notebookEntries.map(noteToLogEntry),
-    final_insights: getFinalInsightContents(),
+    user_notes: userNotes,
+    notes: userNotes,
+    table_chat_histories: getTableChatHistories(),
+    user_final_submission: finalSubmission,
+    final_insights: finalSubmission.fields,
     activity_log: userActivityLog,
   };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
@@ -2081,6 +2145,7 @@ if (bottomPanel && bottomPanelToggle) {
       bottomPanel.querySelectorAll(".bottom-tab").forEach(t => t.classList.remove("active"));
       tab.classList.add("active");
       const key = tab.dataset.tab;
+      bottomPanel.dataset.activeTab = key || "";
       bottomPanel.querySelectorAll(".bottom-tab-content").forEach(c => c.classList.toggle("active", c.dataset.tab === key));
       setBottomPanelExpanded(true);
     }
@@ -2088,6 +2153,7 @@ if (bottomPanel && bottomPanelToggle) {
   bottomPanelToggle.addEventListener("click", () => {
     setBottomPanelExpanded(!bottomPanel.classList.contains("expanded"));
   });
+  bottomPanel.dataset.activeTab = bottomPanel.querySelector(".bottom-tab.active")?.dataset.tab || "notebook";
   syncBottomPanelLayoutState();
 }
 
@@ -2104,6 +2170,7 @@ function syncBottomPanelLayoutState() {
 function expandBottomPanel(tabKey) {
   if (!bottomPanel) return;
   if (tabKey) {
+    bottomPanel.dataset.activeTab = tabKey;
     bottomPanel.querySelectorAll(".bottom-tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tabKey));
     bottomPanel.querySelectorAll(".bottom-tab-content").forEach(c => c.classList.toggle("active", c.dataset.tab === tabKey));
   }
