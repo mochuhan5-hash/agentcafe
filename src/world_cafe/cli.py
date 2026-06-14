@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from rich.console import Console
 
 from world_cafe.graph import build_world_cafe_graph, create_initial_state
-from world_cafe.llm import AnthropicCafeLLM, DryRunCafeLLM
+from world_cafe.llm import DryRunCafeLLM, OpenAICafeLLM
 from world_cafe.profiles import load_agent_profiles, load_questions
 from world_cafe.report import write_outputs
 
@@ -77,8 +77,8 @@ def _build_llm(args: argparse.Namespace):
     if args.dry_run:
         return DryRunCafeLLM()
     if args.model:
-        os.environ["ANTHROPIC_MODEL"] = args.model
-    return AnthropicCafeLLM.from_env(temperature=args.temperature, max_tokens=args.max_tokens)
+        os.environ["OPENAI_MODEL"] = args.model
+    return OpenAICafeLLM.from_env(temperature=args.temperature, max_tokens=args.max_tokens)
 
 
 def _parse_args() -> argparse.Namespace:
@@ -93,7 +93,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--rounds", type=int, default=3, help="Discussion rounds. Default: 3.")
     parser.add_argument("--tables", type=int, default=4, help="Number of tables. Default: 4.")
     parser.add_argument("--seats", type=int, default=4, help="Agents per table. Default: 4.")
-    parser.add_argument("--model", help="Anthropic-compatible model id. Default: ANTHROPIC_MODEL.")
+    parser.add_argument("--model", help="OpenAI-compatible model id. Default: OPENAI_MODEL.")
     parser.add_argument("--max-tokens", type=int, default=1600)
     parser.add_argument("--temperature", type=float, default=0.7)
     parser.add_argument("--dry-run", action="store_true", help="Use deterministic local output.")

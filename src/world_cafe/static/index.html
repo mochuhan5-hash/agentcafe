@@ -4,101 +4,146 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Agent Cafe</title>
-    <link rel="stylesheet" href="/static/styles.css?v=20260601-2" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/styles.css?v=20260608-brief-harvest-1" />
   </head>
   <body>
-    <div class="app-shell">
+    <div class="app-shell mode-config">
       <header class="topbar">
-        <div>
-          <h1>Agent Cafe</h1>
-          <p id="modelBadge" class="model-badge">checking model</p>
+        <div class="brand-group">
+          <div class="logo-wrapper">
+            <svg class="cafe-logo-svg" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M17 8h1a4 4 0 1 1 0 8h-1" />
+              <path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z" />
+              <line x1="6" x2="6" y1="2" y2="4" />
+              <line x1="10" x2="10" y1="2" y2="4" />
+              <line x1="14" x2="14" y1="2" y2="4" />
+            </svg>
+          </div>
+          <div>
+            <h1>Agent Cafe</h1>
+            <p id="modelBadge" class="model-badge">checking model</p>
+          </div>
         </div>
-        <div class="status-pill" id="runStatus">Idle</div>
+        <div class="topbar-actions">
+          <button type="button" class="secondary" id="newOrderBtn" hidden>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+              <path d="M21 3v5h-5" />
+              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+              <path d="M3 21v-5h5" />
+            </svg>
+            <span>新研讨 (New Order)</span>
+          </button>
+          <div class="status-pill" id="runStatus">空闲</div>
+        </div>
       </header>
 
       <main class="workspace">
         <section class="request-pane" aria-label="用户聊天窗口">
           <div class="pane-header">
-            <h2>Request</h2>
+            <h2>研讨主题</h2>
             <span id="roundBadge">0 / 0</span>
           </div>
 
-          <div class="chat-log" id="chatLog" aria-live="polite"></div>
-
-          <div class="settings-panel" aria-label="流程设置">
-            <label>
-              <span>桌数</span>
-              <input id="tableCount" type="number" min="1" max="8" value="4" />
-            </label>
-            <label>
-              <span>每桌发言人数</span>
-              <input id="speakersPerTable" type="number" min="1" max="8" value="3" />
-            </label>
-            <label>
-              <span>轮数</span>
-              <input id="roundCount" type="number" min="1" max="6" value="3" />
-            </label>
-            <label>
-              <span>每人发言次数</span>
-              <input id="speechesPerAgent" type="number" min="1" max="8" value="3" />
-            </label>
-          </div>
-
           <form class="request-form" id="requestForm">
-            <div class="background-upload">
-              <label for="backgroundFile">背景材料（Markdown，可选）</label>
-              <input id="backgroundFile" type="file" accept=".md,.markdown,text/markdown,text/plain" />
-              <div class="background-meta">
-                <span id="backgroundSummary">未上传背景材料</span>
-                <button type="button" class="secondary" id="clearBackgroundBtn" hidden>清除</button>
+            <div class="request-pane-scrollable">
+              <div class="chat-log" id="chatLog" aria-live="polite"></div>
+
+              <div class="settings-panel" aria-label="流程设置">
+                <label>
+                  <span>桌数</span>
+                  <input id="tableCount" type="number" min="1" max="8" value="4" />
+                </label>
+                <label>
+                  <span>每桌发言人数</span>
+                  <input id="speakersPerTable" type="number" min="1" max="8" value="3" />
+                </label>
+                <label>
+                  <span>每人发言次数</span>
+                  <input id="speechesPerAgent" type="number" min="1" max="8" value="3" />
+                </label>
+              </div>
+
+              <div class="request-form-content">
+                <div class="background-upload">
+                  <label for="backgroundFile" class="custom-file-label">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="17 8 12 3 7 8" />
+                      <line x1="12" y1="3" x2="12" y2="15" />
+                    </svg>
+                    <span>Brief / 背景材料（常见文本格式，可选）</span>
+                  </label>
+                  <input id="backgroundFile" type="file" accept=".md,.markdown,.txt,.text,.csv,.tsv,.json,.jsonl,.yaml,.yml,.xml,.html,.htm,.rtf,.log,text/*,application/json,application/xml,application/rtf,text/rtf" />
+                  <div class="background-meta">
+                    <span id="backgroundSummary">未上传背景材料</span>
+                    <button type="button" class="secondary" id="chooseBackgroundBtn">选择文件</button>
+                    <button type="button" class="secondary" id="clearBackgroundBtn" hidden>清除</button>
+                  </div>
+                </div>
+                
+                <div class="textarea-wrapper">
+                  <label for="userRequest">用户请求</label>
+                  <textarea
+                    id="userRequest"
+                    name="userRequest"
+                    rows="5"
+                    placeholder="输入一个希望通过世界咖啡展开的主题或任务..."
+                    required
+                  ></textarea>
+                </div>
               </div>
             </div>
-            <label for="userRequest">用户请求</label>
-            <textarea
-              id="userRequest"
-              name="userRequest"
-              rows="5"
-              placeholder="输入一个希望通过世界咖啡展开的主题或任务"
-              required
-            ></textarea>
+            
             <div class="button-row">
               <button type="submit" id="facilitateBtn">
-                <span aria-hidden="true">✦</span>
-                Facilitate
+                <span class="icon-sparkle">✦</span>
+                主题规划
               </button>
               <button type="button" id="startBtn" disabled>
-                <span aria-hidden="true">▶</span>
-                Start
+                <span class="icon-play">▶</span>
+                开始研讨
               </button>
             </div>
           </form>
-
-          <div class="question-editor" id="questionEditor" hidden></div>
         </section>
 
         <section class="discussion-pane" aria-label="讨论过程">
           <div class="discussion-toolbar">
             <div class="phase-track" id="phaseTrack">
-              <span data-phase="facilitate">Facilitate</span>
-              <span data-phase="setup">Setup</span>
-              <span data-phase="round_started">Rounds</span>
-              <span data-phase="rotation">Rotation</span>
-              <span data-phase="harvest">Harvest</span>
-              <span data-phase="done">Done</span>
+              <span data-phase="facilitate">引导</span>
+              <span data-phase="setup">配置</span>
+              <span data-phase="round_started">研讨</span>
+              <span data-phase="rotation">换桌</span>
+              <span data-phase="harvest">总结</span>
+              <span data-phase="done">完成</span>
             </div>
+            <div class="agent-status-dock" id="agentStatusDock" aria-label="Agent 状态"></div>
             <button type="button" class="secondary" id="pauseBtn" disabled>暂停标注</button>
           </div>
+          <div class="question-editor" id="questionEditor" hidden></div>
           <div class="discussion-layout">
             <div class="discussion-main">
               <div class="tables-grid" id="tablesGrid"></div>
             </div>
             <aside class="notebook-panel" aria-label="标注笔记本">
               <div class="notebook-header">
-                <h2>Notebook</h2>
-                <span id="notebookCount">0 notes</span>
+                <h2>设计笔记本</h2>
+                <span id="notebookCount" class="badge">0 条笔记</span>
               </div>
-              <p class="notebook-hint">暂停后在 agent 原文中划选文字，点击“加入笔记”。</p>
-              <button type="button" class="secondary" id="addNoteBtn" disabled>加入笔记</button>
+              <p class="notebook-hint">暂停后在 agent 原文中划选文字，点击“加入笔记”进行标注。</p>
+              <div id="noteCheckpointPanel" class="note-checkpoint-panel" hidden>
+                <strong id="noteCheckpointTitle">完成本桌笔记后换桌</strong>
+                <p id="noteCheckpointDetail">请先完成本桌本轮的设计洞察/机会笔记，点击“换桌”后桌长才会生成本轮记忆。</p>
+                <button type="button" id="continueNotesBtn">换桌</button>
+              </div>
+              <div class="notebook-actions">
+                <button type="button" class="secondary" id="addNoteBtn" disabled>加入笔记</button>
+                <button type="button" class="secondary" id="downloadActivityLogBtn">下载日志</button>
+              </div>
               <div id="notebookList" class="notebook-list"></div>
             </aside>
           </div>
@@ -107,34 +152,56 @@
 
       <section class="harvest-band" aria-label="全局 harvest">
         <div class="harvest-header">
-          <h2>Global Harvest</h2>
-          <span id="traceCount">0 events</span>
+          <h2>全局成果收获</h2>
+          <span id="traceCount" class="badge">0 个事件</span>
         </div>
         <div id="harvestContent" class="markdown-lite muted">等待讨论完成</div>
         <div class="design-opportunities" aria-label="设计机会洞察">
-          <h3>设计机会洞察</h3>
+          <h3>结构化设计洞察</h3>
           <div class="opportunity-grid">
             <label>
-              <span>机会 1</span>
-              <textarea rows="3" placeholder="写下一个设计机会"></textarea>
+              <span>洞察 1</span>
+              <textarea rows="3" placeholder="写下结构化洞察：用户需求 / 问题重构 / 设计方向..."></textarea>
             </label>
             <label>
-              <span>机会 2</span>
-              <textarea rows="3" placeholder="写下一个设计机会"></textarea>
+              <span>洞察 2</span>
+              <textarea rows="3" placeholder="写下结构化洞察：用户需求 / 问题重构 / 设计方向..."></textarea>
             </label>
             <label>
-              <span>机会 3</span>
-              <textarea rows="3" placeholder="写下一个设计机会"></textarea>
-            </label>
-            <label>
-              <span>机会 4</span>
-              <textarea rows="3" placeholder="写下一个设计机会"></textarea>
+              <span>洞察 3</span>
+              <textarea rows="3" placeholder="写下结构化洞察：用户需求 / 问题重构 / 设计方向..."></textarea>
             </label>
           </div>
         </div>
       </section>
     </div>
 
-    <script src="/static/app.js?v=20260601-2" type="module"></script>
+    <!-- Agent Detail Modal / Overlay -->
+    <div id="agentProfileModal" class="agent-profile-modal" hidden>
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <button class="modal-close" id="modalCloseBtn">&times;</button>
+        <div class="agent-profile-header">
+          <div class="agent-large-avatar" id="modalAgentAvatar">?</div>
+          <div>
+            <h3 id="modalAgentName">智能体名称</h3>
+            <span class="role-chip" id="modalAgentRole">角色</span>
+          </div>
+        </div>
+        <div class="agent-profile-body">
+          <div class="profile-section" id="modalAgentMemorySection" hidden></div>
+          <div class="profile-section">
+            <h4>专家技能</h4>
+            <div class="skills-grid" id="modalAgentSkills"></div>
+          </div>
+          <div class="profile-section">
+            <h4>讨论风格与关注视角</h4>
+            <p id="modalAgentStyle">加载中...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/app.js?v=20260608-brief-harvest-1" type="module"></script>
   </body>
 </html>
