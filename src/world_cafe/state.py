@@ -5,8 +5,8 @@ from typing import Annotated, Any, Literal, TypedDict
 
 
 TABLEMEMORY_USAGE_DESCRIPTION = (
-    "既有 formatmemory 是本桌过去轮次的累计记忆，只用于识别延续、变化和重复。"
-    "本轮输出的 formatmemory 只能新增 round_index = 当前轮次 的一条记录，不要改写过去轮次。"
+    "Existing formatmemory is the accumulated memory of this table's prior rounds, used only to identify continuity, change, and repetition. "
+    "This round's formatmemory must add exactly one new record with round_index equal to the current round, without rewriting prior rounds."
 )
 
 

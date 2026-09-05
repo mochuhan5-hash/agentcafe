@@ -60,48 +60,48 @@ let agentMemorySnapshots = {};
 const phaseOrder = ["facilitate", "setup", "round_started", "rotation", "harvest", "done"];
 const agentRoleStatuses = {
   facilitator: {
-    label: "引导主持",
+    label: "Facilitator",
     initials: "F",
     tone: "green",
-    status: "就绪",
-    detail: "等待梳理各桌研讨问题。",
-    meta: "空闲",
+    status: "Ready",
+    detail: "Waiting to frame discussion questions for each table.",
+    meta: "Idle",
     time: "",
   },
   host: {
-    label: "咖啡桌长",
+    label: "Table Host",
     initials: "H",
     tone: "amber",
-    status: "空闲",
-    detail: "等待记录并维护各桌研讨记忆。",
-    meta: "暂无活跃桌",
+    status: "Idle",
+    detail: "Waiting to record and maintain table memory.",
+    meta: "No active table",
     time: "",
   },
   speaker: {
-    label: "发言代表",
+    label: "Speakers",
     initials: "S",
     tone: "blue",
-    status: "空闲",
-    detail: "等待参与各桌子研讨。",
-    meta: "暂无活跃发言",
+    status: "Idle",
+    detail: "Waiting to join table discussions.",
+    meta: "No active speaker",
     time: "",
   },
   rotation: {
-    label: "桌次轮换",
+    label: "Rotation",
     initials: "R",
     tone: "rose",
-    status: "空闲",
-    detail: "等待代表在不同研讨桌之间轮换。",
-    meta: "暂无路径",
+    status: "Idle",
+    detail: "Waiting for participants to rotate between tables.",
+    meta: "No route yet",
     time: "",
   },
   harvest: {
-    label: "全局总结",
+    label: "Harvest",
     initials: "G",
     tone: "green",
-    status: "空闲",
-    detail: "等待提炼跨桌的共性模式与设计机会。",
-    meta: "未开始",
+    status: "Idle",
+    detail: "Waiting to synthesize cross-table patterns and design opportunities.",
+    meta: "Not started",
     time: "",
   },
 };
@@ -130,13 +130,13 @@ backgroundFileInput.addEventListener("change", async () => {
     return;
   }
   if (!isSupportedBriefFile(file)) {
-    addMessage("error", "请上传常见文本格式的 brief，例如 md、txt、csv、json、yaml、xml、html、rtf 或 log。");
+    addMessage("error", "Please upload a common text brief format, such as md, txt, csv, json, yaml, xml, html, rtf, or log.");
     clearBackground();
     return;
   }
   backgroundContext = await file.text();
   backgroundFilename = file.name;
-  backgroundSummary.textContent = `${backgroundFilename} · ${backgroundContext.length} 字符`;
+  backgroundSummary.textContent = `${backgroundFilename} · ${backgroundContext.length} characters`;
   clearBackgroundBtn.hidden = false;
 });
 
@@ -231,7 +231,7 @@ newOrderBtn?.addEventListener("click", () => {
   hideQuestionEditorView();
   questionEditor.innerHTML = "";
   chatLog.innerHTML = "";
-  addMessage("facilitator", "世界咖啡研讨准备就绪。");
+  addMessage("facilitator", "World Cafe is ready.");
 });
 
 function openAgentProfile(agentId) {
@@ -246,11 +246,11 @@ function openAgentProfile(agentId) {
 
   if (avatar) avatar.textContent = agentInitials(profile.name || agentId);
   if (name) name.textContent = profile.name || agentId;
-  if (role) role.textContent = profile.role || "研讨代表";
+  if (role) role.textContent = profile.role || "Discussion participant";
   if (skills) {
     skills.innerHTML = (profile.skills || []).map(skill => `<span>${escapeHtml(skill)}</span>`).join("");
   }
-  if (style) style.textContent = profile.style || "暂无风格描述。";
+  if (style) style.textContent = profile.style || "No style description yet.";
 
   // Dynamic memory lookup and rendering inside modal
   const memorySection = document.querySelector("#modalAgentMemorySection");
@@ -260,9 +260,9 @@ function openAgentProfile(agentId) {
       const rows = formatMemorySnapshot(snapshot);
       const body = rows.length
         ? rows.map((row) => `<p>${renderInlineMarkdown(escapeHtml(row))}</p>`).join("")
-        : "<p>暂无内在记忆记录。</p>";
+        : "<p>No internal memory yet.</p>";
       memorySection.innerHTML = `
-        <h4>当前内在记忆</h4>
+        <h4>Current Internal Memory</h4>
         <div class="modal-memory-body">${body}</div>
       `;
       memorySection.hidden = false;
@@ -294,13 +294,13 @@ async function init() {
     speechesInput.value = config.default_speeches_per_agent || 3;
     speechesPerAgent = getSpeechesPerAgent();
     if (!config.token_configured) {
-      modelBadge.textContent += " · 未配置 Token";
+      modelBadge.textContent += " · Token not configured";
     }
   } catch {
-    modelBadge.textContent = "配置不可用";
+    modelBadge.textContent = "Config unavailable";
   }
 
-  addMessage("facilitator", "世界咖啡研讨准备就绪。");
+  addMessage("facilitator", "World Cafe is ready.");
   renderAgentStatusDock();
   await loadAgentsForSettings();
 }
@@ -312,9 +312,9 @@ requestForm.addEventListener("submit", async (event) => {
 
   addMessage("user", request);
   updateAgentStatus("facilitator", {
-    status: "读取上下文中",
-    detail: "正在为各桌生成研讨引导问题。",
-    meta: `已请求 ${getTableCount()} 桌`,
+    status: "Reading Context",
+    detail: "Generating guiding questions for each table.",
+    meta: `${getTableCount()} tables requested`,
   });
   setBusy(true);
   setPhase("facilitate");
@@ -328,9 +328,9 @@ requestForm.addEventListener("submit", async (event) => {
     });
     facilitatedTables = result.tables;
     updateAgentStatus("facilitator", {
-      status: "引导问题已就绪",
-      detail: "已成功为各桌生成一个研讨引导问题。",
-      meta: `共 ${facilitatedTables.length} 桌问题`,
+      status: "Questions Ready",
+      detail: "A guiding discussion question has been generated for each table.",
+      meta: `${facilitatedTables.length} table questions`,
     });
     addMessage("facilitator", formatQuestions(facilitatedTables));
     await loadAgentsForSettings();
@@ -338,11 +338,11 @@ requestForm.addEventListener("submit", async (event) => {
     startBtn.disabled = false;
   } catch (error) {
     updateAgentStatus("facilitator", {
-      status: "错误",
+      status: "Error",
       detail: error.message,
-      meta: "引导生成失败",
+      meta: "Facilitation failed",
     });
-    setStatus("引导方案错误", "error");
+    setStatus("Facilitation Error", "error");
     addMessage("error", error.message);
   } finally {
     setBusy(false);
@@ -355,11 +355,11 @@ startBtn.addEventListener("click", async () => {
 
   resetRunView();
   updateAgentStatus("facilitator", {
-    status: "研讨配置就绪",
-    detail: "各桌研讨方案配置已就绪，流程图正在启动中。",
-    meta: `${tables.length} 桌 · ${getRoundCount()} 轮`,
+    status: "Setup Ready",
+    detail: "Table discussion plans are ready and the workflow is starting.",
+    meta: `${tables.length} tables · ${getRoundCount()} rounds`,
   });
-  setStatus("正在启动", "running");
+  setStatus("Starting", "running");
   startBtn.disabled = true;
   facilitateBtn.disabled = true;
 
@@ -414,21 +414,21 @@ function handleRunEvent(event) {
     return;
   }
   if (event.type === "run_started") {
-    setStatus("进行中", "running");
+    setStatus("Running", "running");
     updateAgentStatus("facilitator", {
-      status: "流程已启动",
-      detail: "世界咖啡流程引擎已在运行中。",
-      meta: activeRun ? `已启动 ${activeRun.table_count} 桌` : "研讨进行中",
+      status: "Workflow Started",
+      detail: "The World Cafe workflow engine is running.",
+      meta: activeRun ? `${activeRun.table_count} tables started` : "Discussion running",
     });
     return;
   }
   if (event.type === "pause_changed") {
     if (event.status === "pause_requested") {
-      setStatus("等待当前发言结束后暂停", "running");
+      setStatus("Pausing After Current Speaker", "running");
     } else if (event.status === "paused") {
-      setStatus("等待记录笔记", "running");
+      setStatus("Waiting For Notes", "running");
     } else if (event.status === "running") {
-      setStatus("进行中", "running");
+      setStatus("Running", "running");
     }
     return;
   }
@@ -437,29 +437,29 @@ function handleRunEvent(event) {
     return;
   }
   if (event.type === "error") {
-    setStatus("错误", "error");
+    setStatus("Error", "error");
     updateAgentStatus("facilitator", {
-      status: "错误",
-      detail: event.message || "研讨流程报告了错误。",
-      meta: "需要处理",
+      status: "Error",
+      detail: event.message || "The discussion workflow reported an error.",
+      meta: "Needs attention",
     });
-    addMessage("error", event.message || "运行出错，但后端没有返回详细错误。");
+    addMessage("error", event.message || "The run failed, but the backend did not return a detailed error.");
     newOrderBtn.hidden = false;
     return;
   }
   if (event.type === "run_complete") {
-    setStatus("已完成", "");
+    setStatus("Done", "");
     setPhase("done");
     updateAgentStatus("harvest", {
-      status: "已完成",
-      detail: "全局收获汇总已完成，最终讨论洞察成果已就绪。",
-      meta: `已处理 ${traceTotal} 个事件`,
+      status: "Done",
+      detail: "The global harvest is complete and the final discussion insights are ready.",
+      meta: `${traceTotal} events processed`,
     });
     renderHarvest(event.harvest?.content || "");
-    addMessage("facilitator", "研讨成果全局收获汇总已完成。");
+    addMessage("facilitator", "The global harvest is complete.");
     facilitateBtn.disabled = false;
     pauseBtn.disabled = true;
-    pauseBtn.textContent = "暂停标注";
+    pauseBtn.textContent = "Pause to Annotate";
     isPaused = false;
     activeNoteCheckpoint = null;
     pendingNoteCheckpoints = [];
@@ -475,22 +475,22 @@ function handleRunEvent(event) {
   if (seenEventKeys.has(eventKey)) return;
   seenEventKeys.add(eventKey);
   traceTotal += 1;
-  traceCount.textContent = `${traceTotal} 个事件`;
+  traceCount.textContent = `${traceTotal} events`;
   setPhase(event.stage);
 
   if (event.stage === "round_started") {
     currentRound = (metadata.round_index || 0) + 1;
     roundBadge.textContent = `${currentRound} / ${maxRounds}`;
-    setStatus(`第 ${currentRound} 轮`, "running");
+    setStatus(`Round ${currentRound}`, "running");
     updateAgentStatus("speaker", {
-      status: `第 ${currentRound} 轮就绪`,
-      detail: "发言代表已分配到本轮各研讨桌。",
+      status: `Round ${currentRound} Ready`,
+      detail: "Speakers have been assigned to this round's tables.",
       meta: summarizeAssignments(metadata.assignments || {}),
     });
     updateAgentStatus("host", {
-      status: `第 ${currentRound} 轮倾听中`,
-      detail: "各桌桌长已准备好记录局部讨论记忆并处理讨论线索。",
-      meta: `${Object.keys(metadata.assignments || {}).length} 个活动研讨桌`,
+      status: `Round ${currentRound} Listening`,
+      detail: "Table hosts are ready to record local discussion memory.",
+      meta: `${Object.keys(metadata.assignments || {}).length} active tables`,
     });
     Object.entries(metadata.assignments || {}).forEach(([tableId, agentIds]) => {
       ensureRound(tableId, metadata.round_index || 0, agentIds);
@@ -500,21 +500,21 @@ function handleRunEvent(event) {
   if (event.stage === "table_discussion") {
     ensureRound(metadata.table_id, metadata.round_index || 0, metadata.agent_ids || []);
     updateAgentStatus("speaker", {
-      status: "研讨讨论中",
-      detail: `${metadata.table_id || "研讨桌"} 的讨论正活跃进行中。`,
+      status: "Discussing",
+      detail: `${metadata.table_id || "discussion table"} is active.`,
       meta: formatRoundStatusMeta(metadata),
     });
     updateAgentStatus("host", {
-      status: "观察桌子中",
-      detail: `桌长 ${metadata.host_id || "桌长"} 正在维护 ${metadata.table_id || "该桌"} 的研讨记忆。`,
+      status: "Observing Table",
+      detail: `Host ${metadata.host_id || "host"} is maintaining memory for ${metadata.table_id || "this table"}.`,
       meta: formatRoundStatusMeta(metadata),
     });
   }
 
   if (event.stage === "host_opening") {
     updateAgentStatus("host", {
-      status: "开启讨论轮次",
-      detail: `桌长 ${metadata.host_name || metadata.host_id || "桌长"} 带着引导线索开启了 ${metadata.table_id || "研讨桌"} 的讨论。`,
+      status: "Opening Round",
+      detail: `Host ${metadata.host_name || metadata.host_id || "host"} opened ${metadata.table_id || "the table"} with guiding prompts.`,
       meta: formatRoundStatusMeta(metadata),
     });
     appendHostOpening(metadata);
@@ -522,8 +522,8 @@ function handleRunEvent(event) {
 
   if (event.stage === "agent_contribution") {
     updateAgentStatus("speaker", {
-      status: "代表发言中",
-      detail: `发言代表 ${metadata.agent_name || metadata.agent_id || "代表"} 对 ${metadata.table_id || "研讨桌"} 发表了意见。`,
+      status: "Speaker Contributing",
+      detail: `Speaker ${metadata.agent_name || metadata.agent_id || "participant"} contributed at ${metadata.table_id || "the table"}.`,
       meta: formatTurnStatusMeta(metadata),
     });
     appendContribution(metadata);
@@ -531,29 +531,29 @@ function handleRunEvent(event) {
 
   if (event.stage === "host_record") {
     updateAgentStatus("host", {
-      status: "记录桌子记忆",
-      detail: `桌长 ${metadata.host_name || metadata.host_id || "桌长"} 更新并保存了 ${metadata.table_id || "研讨桌"} 的讨论记忆。`,
+      status: "Recording Table Memory",
+      detail: `Host ${metadata.host_name || metadata.host_id || "host"} updated and saved memory for ${metadata.table_id || "the table"}.`,
       meta: formatRoundStatusMeta(metadata),
     });
     appendHostRecord(metadata);
   }
 
   if (event.stage === "rotation") {
-    setStatus(`正在轮换至第 ${(metadata.next_round_index || 0) + 1} 轮`, "running");
+    setStatus(`Rotating To Round ${(metadata.next_round_index || 0) + 1}`, "running");
     updateAgentStatus("rotation", {
-      status: "代表轮换中",
-      detail: "非桌长的发言代表正在轮换去下一张研讨桌。",
+      status: "Rotating Speakers",
+      detail: "Non-host speakers are rotating to the next table.",
       meta: formatRotationMeta(metadata),
     });
     appendRotationRecord(metadata);
   }
 
   if (event.stage === "harvest") {
-    setStatus("正在全局成果提炼", "running");
+    setStatus("Harvesting", "running");
     updateAgentStatus("harvest", {
-      status: "全局成果汇总中",
-      detail: "全局成果总结正在对共性模式、弱信号、张力以及设计机会进行聚类提炼。",
-      meta: `${metadata.round_count || maxRounds || "?"} 轮研讨`,
+      status: "Synthesizing Harvest",
+      detail: "The harvest is clustering shared patterns, weak signals, tensions, and design opportunities.",
+      meta: `${metadata.round_count || maxRounds || "?"} discussion rounds`,
     });
   }
 }
@@ -592,7 +592,7 @@ function updateAgentStatus(key, updates) {
   agentRoleStatuses[key] = {
     ...agentRoleStatuses[key],
     ...updates,
-    time: new Date().toLocaleTimeString(),
+    time: formatActivityTime(),
   };
   renderAgentStatusDock();
 }
@@ -603,16 +603,16 @@ function summarizeAssignments(assignments) {
     (count, agents) => count + Math.max((agents || []).length - 1, 0),
     0,
   );
-  return `${tableCount} 桌 · ${speakerCount} 位发言代表`;
+  return `${tableCount} tables · ${speakerCount} speakers`;
 }
 
 function formatRoundStatusMeta(metadata) {
   const round = Number.isFinite(Number(metadata.round_index))
-    ? `第 ${Number(metadata.round_index) + 1} 轮`
-    : "第 ? 轮";
-  const parts = [`${metadata.table_id || "研讨桌 ?"} · ${round}`];
+    ? `Round ${Number(metadata.round_index) + 1}`
+    : "Round ?";
+  const parts = [`${metadata.table_id || "table ?"} · ${round}`];
   if (Object.prototype.hasOwnProperty.call(metadata, "background_context_chars")) {
-    parts.push(`背景 ${Number(metadata.background_context_chars) || 0} 字符`);
+    parts.push(`${Number(metadata.background_context_chars) || 0} background chars`);
   }
   return parts.join(" · ");
 }
@@ -622,17 +622,17 @@ function formatRotationMeta(metadata) {
   const nextRound = Number.isFinite(Number(metadata.next_round_index))
     ? Number(metadata.next_round_index) + 1
     : "?";
-  return `${tableCount || "?"} 桌 · 第 ${nextRound} 轮`;
+  return `${tableCount || "?"} tables · Round ${nextRound}`;
 }
 
 function formatTurnStatusMeta(metadata) {
   const roundMeta = formatRoundStatusMeta(metadata);
   const turn = Number.isFinite(Number(metadata.turn_index))
-    ? `总第 ${Number(metadata.turn_index) + 1} 位`
-    : "总第 ? 位";
+    ? `Turn ${Number(metadata.turn_index) + 1}`
+    : "Turn ?";
   const cycle = Number.isFinite(Number(metadata.cycle_index))
-    ? `第 ${Number(metadata.cycle_index) + 1} 次发言`
-    : "第 ? 次发言";
+    ? `Cycle ${Number(metadata.cycle_index) + 1}`
+    : "Cycle ?";
   return `${roundMeta} · ${cycle} · ${turn}`;
 }
 
@@ -714,16 +714,16 @@ function renderLeftFieldLegacy(table) {
     <div class="question-header">
       <label for="${tableId}">${tableId.replace("_", " ").toUpperCase()}</label>
       <div class="host-badge-editor">
-        <span class="host-label">桌长:</span>
+        <span class="host-label">Host:</span>
         <span class="host-name">${escapeHtml(host?.name || hostId || "")}</span>
       </div>
     </div>
-    <textarea id="${tableId}" data-table-id="${tableId}" placeholder="请输入讨论主题/引导问题...">${escapeHtml(table.question)}</textarea>
+    <textarea id="${tableId}" data-table-id="${tableId}" placeholder="Enter a discussion topic or guiding question...">${escapeHtml(table.question)}</textarea>
     
     <div class="speaker-select-section">
       <div class="assignment-meta">
-        <span>选择普通 Agent</span>
-        <span data-selected-count="${tableId}">已选 ${speakers.size} 人</span>
+        <span>Select speaking agents</span>
+        <span data-selected-count="${tableId}">${speakers.size} selected</span>
       </div>
       <select class="agent-select" multiple size="4" data-agent-select="${tableId}">
         ${options}
@@ -735,7 +735,7 @@ function renderLeftFieldLegacy(table) {
   select.addEventListener("change", () => {
     speakerAssignments[tableId] = [...select.selectedOptions].map((option) => option.value);
     field.querySelector(`[data-selected-count="${tableId}"]`).textContent =
-      `已选 ${speakerAssignments[tableId].length} 人`;
+      `${speakerAssignments[tableId].length} selected`;
     refreshAgentPromptBoxes(tableId);
   });
 
@@ -748,7 +748,7 @@ function renderRightField(tableId) {
   wrapper.dataset.assignmentTableId = tableId;
   wrapper.innerHTML = `
     <div class="prompt-header">
-      <span>Agent 提示词配置</span>
+      <span>Agent Prompt Configuration</span>
     </div>
     <div class="agent-prompt-list" data-prompt-list-table="${tableId}"></div>
   `;
@@ -772,7 +772,7 @@ function refreshAgentPromptBoxes(tableId) {
     container.innerHTML = `
       <div class="empty-prompt-placeholder">
         <span class="placeholder-icon">✨</span>
-        <span class="placeholder-text">在左侧选择普通 Agent 以配置其专属提示词</span>
+        <span class="placeholder-text">Select speaking agents on the left to configure their prompts</span>
       </div>
     `;
     return;
@@ -784,13 +784,13 @@ function refreshAgentPromptBoxes(tableId) {
     const box = document.createElement("div");
     box.className = "agent-prompt-box";
     box.innerHTML = `
-      <label>${escapeHtml(agentName)} · 提示词</label>
+      <label>${escapeHtml(agentName)} · Prompt</label>
       <textarea
         data-agent-prompt-id="${escapeHtml(agentId)}"
         data-agent-prompt-for="${escapeHtml(agentName)}"
         data-agent-prompt-table="${escapeHtml(tableId)}"
         rows="2"
-        placeholder="为 ${escapeHtml(agentName)} 设置额外的 System Prompt（可选）"
+        placeholder="Add an extra system prompt for ${escapeHtml(agentName)} (optional)"
       >${escapeHtml(existingValues[agentId] || "")}</textarea>
     `;
     container.append(box);
@@ -897,7 +897,7 @@ function renderTables(run) {
       <header>
         <div class="table-title">
           <h3>${tableId.replace("_", " ").toUpperCase()}</h3>
-          <span class="host-tag">桌长 ${escapeHtml(hostName)}</span>
+          <span class="host-tag">Host ${escapeHtml(hostName)}</span>
         </div>
         <div class="table-question">
           <span>${escapeHtml(question)}</span>
@@ -960,7 +960,7 @@ function drawSeatingChart(tableElement, tableId, agentIds, activeSpeakerId = nul
     const popover = document.createElement("div");
     popover.className = "seat-memory-popover";
     const snapshot = agentMemorySnapshots[agentId];
-    const roleTag = isHost ? "桌长" : "发言嘉宾";
+    const roleTag = isHost ? "Host" : "Speaker";
     popover.innerHTML = renderSeatMemoryCard(name, roleTag, snapshot);
     seat.append(popover);
 
@@ -1033,7 +1033,7 @@ function appendHostOpening(metadata) {
     className: "host-opening",
     agentId: metadata.host_id,
     agentName: tableHostLabel(metadata.table_id),
-    roleLabel: "桌长开场",
+    roleLabel: "Host Opening",
     metaLabel: formatRoundStatusMeta(metadata),
     content: metadata.content || "",
     memorySnapshot: metadata.memory_snapshot,
@@ -1069,10 +1069,10 @@ function appendContribution(metadata) {
     speech.classList.add("speech-error");
   }
   const turnLabel = Number.isFinite(Number(metadata.turn_index))
-    ? ` · 总第 ${Number(metadata.turn_index) + 1} 位`
+    ? ` · Turn ${Number(metadata.turn_index) + 1}`
     : "";
   const cycleLabel = Number.isFinite(Number(metadata.cycle_index))
-    ? ` · 第 ${Number(metadata.cycle_index) + 1} 次发言`
+    ? ` · Cycle ${Number(metadata.cycle_index) + 1}`
     : "";
   speech.innerHTML = `
     ${renderAgentMessage({
@@ -1104,7 +1104,7 @@ function appendHostRecord(metadata) {
       className: "host-record",
       agentId: metadata.host_id,
       agentName: tableHostLabel(metadata.table_id),
-      roleLabel: "桌长记录",
+      roleLabel: "Host Record",
       metaLabel: formatRoundStatusMeta(metadata),
       content: metadata.content || "",
       memorySnapshot: metadata.memory_snapshot,
@@ -1140,7 +1140,7 @@ function renderAgentMessage({
     .join(" ");
   return `
     <div class="${escapeHtml(classes)}">
-      <button class="message-avatar" type="button" aria-label="${escapeHtml(agentName || agentId)} 的内在记忆" data-avatar-agent-id="${escapeHtml(agentId)}">
+      <button class="message-avatar" type="button" aria-label="${escapeHtml(agentName || agentId)} internal memory" data-avatar-agent-id="${escapeHtml(agentId)}">
         <span>${escapeHtml(initials)}</span>
         ${renderMemoryTooltip(agentName || agentId, memorySnapshot)}
       </button>
@@ -1160,7 +1160,7 @@ function renderMemoryTooltip(agentName, snapshot) {
   const body = renderMemoryTooltipBody(snapshot);
   return `
     <span class="memory-card" role="tooltip">
-      <strong>${escapeHtml(agentName)} · 内在记忆</strong>
+      <strong>${escapeHtml(agentName)} · Internal Memory</strong>
       ${body}
     </span>
   `;
@@ -1168,7 +1168,7 @@ function renderMemoryTooltip(agentName, snapshot) {
 
 function renderMemoryTooltipBody(snapshot) {
   if (!snapshot || typeof snapshot !== "object") {
-    return "<p>暂无内在记忆记录。</p>";
+    return "<p>No internal memory yet.</p>";
   }
   if (snapshot.kind === "table_host") {
     return renderHostMemoryTooltip(snapshot);
@@ -1176,14 +1176,14 @@ function renderMemoryTooltipBody(snapshot) {
   const rows = formatMemorySnapshot(snapshot);
   return rows.length
     ? rows.map((row) => `<p>${renderInlineMarkdown(escapeHtml(row))}</p>`).join("")
-    : "<p>暂无内在记忆记录。</p>";
+    : "<p>No internal memory yet.</p>";
 }
 
 function renderHostMemoryTooltip(snapshot) {
   const usage = snapshot.tablememory_usage_description
     ? `<p class="memory-usage">${escapeHtml(snapshot.tablememory_usage_description)}</p>`
     : "";
-  const summary = `<p>当前桌面记忆：${escapeHtml(snapshot.living_summary || "暂无")}</p>`;
+  const summary = `<p>Current table memory: ${escapeHtml(snapshot.living_summary || "None yet")}</p>`;
   const rounds = (snapshot.recent_rounds || [])
     .filter((round) => round && typeof round === "object")
     .map(renderMemoryRound)
@@ -1195,7 +1195,7 @@ function renderHostMemoryTooltip(snapshot) {
     minority_inspiring_views: snapshot.formatmemory?.minority_inspiring_views || snapshot.incomplete_or_weak_patterns || [],
     unresolved_tensions: snapshot.formatmemory?.unresolved_tensions || snapshot.tensions || [],
   });
-  return `${usage}${summary}${fallbackRound}${renderMemoryList("下一轮问题种子", snapshot.next_round_question_seeds)}`;
+  return `${usage}${summary}${fallbackRound}${renderMemoryList("Next-round question seeds", snapshot.next_round_question_seeds)}`;
 }
 
 function renderMemoryRound(round) {
@@ -1203,9 +1203,9 @@ function renderMemoryRound(round) {
     <section class="memory-round">
       <h4>Round ${escapeHtml(round.round || "?")}</h4>
       ${round.synthesis ? `<p class="memory-round-summary">${escapeHtml(round.synthesis)}</p>` : ""}
-      ${renderMemoryList("重复主题", round.repeated_themes)}
-      ${renderMemoryList("少数启发", round.minority_inspiring_views)}
-      ${renderMemoryList("未解张力", round.unresolved_tensions)}
+      ${renderMemoryList("Recurring Themes", round.repeated_themes)}
+      ${renderMemoryList("Minority Signals", round.minority_inspiring_views)}
+      ${renderMemoryList("Unresolved Tensions", round.unresolved_tensions)}
     </section>
   `;
 }
@@ -1228,7 +1228,7 @@ function renderSeatMemoryCard(agentName, roleTag, snapshot) {
       sections.push(`<div class="smc-section smc-usage"><div class="smc-section-body">${escapeHtml(snapshot.tablememory_usage_description)}</div></div>`);
     }
     if (snapshot.living_summary) {
-      sections.push(`<div class="smc-section"><div class="smc-section-title">📝 桌面记忆</div><div class="smc-section-body">${escapeHtml(snapshot.living_summary)}</div></div>`);
+      sections.push(`<div class="smc-section"><div class="smc-section-title">Table Memory</div><div class="smc-section-body">${escapeHtml(snapshot.living_summary)}</div></div>`);
     }
     const rounds = (snapshot.recent_rounds || [])
       .filter((round) => round && typeof round === "object")
@@ -1236,25 +1236,25 @@ function renderSeatMemoryCard(agentName, roleTag, snapshot) {
       .join("");
     if (rounds) sections.push(rounds);
     if (Array.isArray(snapshot.next_round_question_seeds) && snapshot.next_round_question_seeds.length) {
-      sections.push(`<div class="smc-section"><div class="smc-section-title">🌱 下一轮问题种子</div><ul class="smc-list">${snapshot.next_round_question_seeds.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul></div>`);
+      sections.push(`<div class="smc-section"><div class="smc-section-title">Next-round Question Seeds</div><ul class="smc-list">${snapshot.next_round_question_seeds.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul></div>`);
     }
   } else if (snapshot) {
     if (snapshot.bridge_intent) {
-      sections.push(`<div class="smc-section"><div class="smc-section-title">🔗 迁移意图</div><div class="smc-section-body">${escapeHtml(snapshot.bridge_intent)}</div></div>`);
+      sections.push(`<div class="smc-section"><div class="smc-section-title">Bridge Intent</div><div class="smc-section-body">${escapeHtml(snapshot.bridge_intent)}</div></div>`);
     }
     if (snapshot.agent_generated_memory) {
       const mem = snapshot.agent_generated_memory;
       if (typeof mem === "string" && mem.trim()) {
-        sections.push(`<div class="smc-section"><div class="smc-section-title">🧠 个人记忆</div><div class="smc-section-body">${escapeHtml(mem)}</div></div>`);
+        sections.push(`<div class="smc-section"><div class="smc-section-title">Personal Memory</div><div class="smc-section-body">${escapeHtml(mem)}</div></div>`);
       } else if (typeof mem === "object" && !Array.isArray(mem)) {
         const items = Object.entries(mem).filter(([, v]) => v !== null && v !== "").map(([k, v]) => `<li><strong>${escapeHtml(k)}</strong>: ${escapeHtml(String(v))}</li>`).join("");
-        if (items) sections.push(`<div class="smc-section"><div class="smc-section-title">🧠 个人记忆</div><ul class="smc-list">${items}</ul></div>`);
+        if (items) sections.push(`<div class="smc-section"><div class="smc-section-title">Personal Memory</div><ul class="smc-list">${items}</ul></div>`);
       }
     }
   }
   const body = sections.length
     ? sections.join("")
-    : '<div class="smc-empty">暂无内在记忆</div>';
+    : '<div class="smc-empty">No internal memory yet</div>';
   return `
     <div class="smc-header">
       <span class="smc-name">${escapeHtml(agentName)}</span>
@@ -1269,9 +1269,9 @@ function renderSeatMemoryRound(round) {
     <div class="smc-section smc-round">
       <div class="smc-section-title">Round ${escapeHtml(round.round || "?")}</div>
       ${round.synthesis ? `<div class="smc-section-body">${escapeHtml(round.synthesis)}</div>` : ""}
-      ${renderSeatMemoryList("重复主题", round.repeated_themes)}
-      ${renderSeatMemoryList("少数启发", round.minority_inspiring_views)}
-      ${renderSeatMemoryList("未解张力", round.unresolved_tensions)}
+      ${renderSeatMemoryList("Recurring Themes", round.repeated_themes)}
+      ${renderSeatMemoryList("Minority Signals", round.minority_inspiring_views)}
+      ${renderSeatMemoryList("Unresolved Tensions", round.unresolved_tensions)}
     </div>
   `;
 }
@@ -1295,36 +1295,36 @@ function formatMemorySnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== "object") return [];
   const rows = [];
   if (snapshot.kind === "table_host") {
-    rows.push(`当前桌面记忆：${snapshot.living_summary || "暂无"}`);
-    addListRows(rows, "保留洞察", snapshot.key_insights);
-    addListRows(rows, "开放问题", snapshot.open_questions);
-    addListRows(rows, "张力", snapshot.tensions);
-    if (snapshot.cumulative_pattern_evolution) rows.push(`累计演化：${snapshot.cumulative_pattern_evolution}`);
-    addListRows(rows, "跨轮重复模式", snapshot.recurring_patterns_across_rounds);
-    addListRows(rows, "变化中的信号", snapshot.emerging_or_fading_signals);
-    addListRows(rows, "持续未解张力", snapshot.unresolved_tensions_over_time);
-    if (snapshot.round_pattern_delta) rows.push(`本轮在累计历史中的变化：${snapshot.round_pattern_delta}`);
-    addListRows(rows, "下一轮问题种子", snapshot.next_round_question_seeds);
+    rows.push(`Current table memory: ${snapshot.living_summary || "None yet"}`);
+    addListRows(rows, "Retained insights", snapshot.key_insights);
+    addListRows(rows, "Open questions", snapshot.open_questions);
+    addListRows(rows, "Tensions", snapshot.tensions);
+    if (snapshot.cumulative_pattern_evolution) rows.push(`Cumulative evolution: ${snapshot.cumulative_pattern_evolution}`);
+    addListRows(rows, "Cross-round recurring patterns", snapshot.recurring_patterns_across_rounds);
+    addListRows(rows, "Emerging or fading signals", snapshot.emerging_or_fading_signals);
+    addListRows(rows, "Persistent unresolved tensions", snapshot.unresolved_tensions_over_time);
+    if (snapshot.round_pattern_delta) rows.push(`This round's shift within the accumulated history: ${snapshot.round_pattern_delta}`);
+    addListRows(rows, "Next-round question seeds", snapshot.next_round_question_seeds);
     (snapshot.recent_rounds || []).forEach((round) => {
-      if (round.synthesis) rows.push(`第 ${round.round} 轮汇总：${round.synthesis}`);
-      if (round.cumulative_pattern_evolution) rows.push(`第 ${round.round} 轮演化：${round.cumulative_pattern_evolution}`);
+      if (round.synthesis) rows.push(`Round ${round.round} synthesis: ${round.synthesis}`);
+      if (round.cumulative_pattern_evolution) rows.push(`Round ${round.round} evolution: ${round.cumulative_pattern_evolution}`);
     });
     return rows;
   }
-  if (snapshot.bridge_intent) rows.push(`迁移意图：${snapshot.bridge_intent}`);
-  addObjectRows(rows, "个人迁移记忆", snapshot.agent_generated_memory);
+  if (snapshot.bridge_intent) rows.push(`Bridge intent: ${snapshot.bridge_intent}`);
+  addObjectRows(rows, "Personal migration memory", snapshot.agent_generated_memory);
   return rows;
 }
 
 function addListRows(rows, label, value) {
   if (!Array.isArray(value) || !value.length) return;
-  rows.push(`${label}：${value.join("；")}`);
+  rows.push(`${label}: ${value.join("; ")}`);
 }
 
 function addObjectRows(rows, label, value) {
   if (!value) return;
   if (typeof value === "string") {
-    if (value.trim()) rows.push(`${label}：${value}`);
+    if (value.trim()) rows.push(`${label}: ${value}`);
     return;
   }
   if (Array.isArray(value)) {
@@ -1335,8 +1335,8 @@ function addObjectRows(rows, label, value) {
     const compact = Object.entries(value)
       .filter(([, item]) => item !== null && item !== "")
       .map(([key, item]) => `${key}: ${item}`)
-      .join("；");
-    if (compact) rows.push(`${label}：${compact}`);
+      .join("; ");
+    if (compact) rows.push(`${label}: ${compact}`);
   }
 }
 
@@ -1368,7 +1368,7 @@ function appendRotationRecord(metadata) {
       list.append(record);
     }
     record.innerHTML = `
-      <strong>轮换到 Round ${escapeHtml(nextRound)}</strong>
+      <strong>Rotate To Round ${escapeHtml(nextRound)}</strong>
       <p>${escapeHtml(formatRotatedAssignment(agentIds || []))}</p>
     `;
   });
@@ -1385,7 +1385,7 @@ function renderHarvest(markdown) {
   harvestContent.dataset.sourceType = "harvest";
   harvestContent.dataset.tableId = "harvest";
   harvestContent.dataset.roundIndex = Number.isFinite(Number(maxRounds)) ? String(maxRounds) : "";
-  harvestContent.dataset.speakerName = "全局总结";
+  harvestContent.dataset.speakerName = "Global Harvest";
   harvestContent.dataset.speakerId = "harvest";
   harvestContent.innerHTML = renderMarkdownLite(markdown || "No harvest generated.");
 }
@@ -1405,21 +1405,21 @@ function resetRunView() {
   pendingNoteCheckpoints = [];
   activeNoteCheckpoint = null;
   pauseBtn.disabled = true;
-  pauseBtn.textContent = "暂停标注";
+  pauseBtn.textContent = "Pause to Annotate";
   addNoteBtn.disabled = true;
   hideNoteCheckpointPanel();
   hideQuestionEditorView();
   discussionPane.classList.remove("paused");
   // Clear gated-pulse highlight
   document.querySelectorAll(".table-card").forEach(card => card.classList.remove("gated-pulse"));
-  traceCount.textContent = "0 个事件";
+  traceCount.textContent = "0 events";
   harvestContent.classList.add("muted");
   harvestContent.removeAttribute("data-source-type");
   harvestContent.removeAttribute("data-table-id");
   harvestContent.removeAttribute("data-round-index");
   harvestContent.removeAttribute("data-speaker-name");
   harvestContent.removeAttribute("data-speaker-id");
-  harvestContent.textContent = "等待讨论完成";
+  harvestContent.textContent = "Waiting for the discussion to finish";
   tablesGrid.innerHTML = "";
   resetAgentRoleStatuses();
   renderNotebook();
@@ -1430,24 +1430,24 @@ function resetRunView() {
 
 function resetAgentRoleStatuses() {
   updateAgentStatus("host", {
-    status: "空闲",
-    detail: "等待记录并维护各桌研讨记忆。",
-    meta: "暂无活动桌",
+    status: "Idle",
+    detail: "Waiting to record and maintain table memory.",
+    meta: "No active table",
   });
   updateAgentStatus("speaker", {
-    status: "空闲",
-    detail: "等待参与各桌讨论。",
-    meta: "暂无活动发言人",
+    status: "Idle",
+    detail: "Waiting to join table discussions.",
+    meta: "No active speaker",
   });
   updateAgentStatus("rotation", {
-    status: "空闲",
-    detail: "等待代表在不同研讨桌之间轮换。",
-    meta: "暂无路径",
+    status: "Idle",
+    detail: "Waiting for participants to rotate between tables.",
+    meta: "No route yet",
   });
   updateAgentStatus("harvest", {
-    status: "空闲",
-    detail: "等待提炼跨桌的共性模式与设计机会。",
-    meta: "未开始",
+    status: "Idle",
+    detail: "Waiting to synthesize cross-table patterns and design opportunities.",
+    meta: "Not started",
   });
 }
 
@@ -1479,15 +1479,15 @@ function buildDefaultAssignments(tables) {
 }
 
 function formatRoundMeta(agentIds) {
-  const agents = agentIds.length ? formatRotatedAssignment(agentIds) : "等待中";
-  return `${agents} · 每人 ${speechesPerAgent} 次`;
+  const agents = agentIds.length ? formatRotatedAssignment(agentIds) : "Waiting";
+  return `${agents} · ${speechesPerAgent} turns each`;
 }
 
 function formatRotatedAssignment(agentIds) {
   return agentIds
     .map((agentId, index) => {
       const name = getAgentName(agentId);
-      return index === 0 ? `桌长留守 ${name}` : name;
+      return index === 0 ? `Host stays: ${name}` : name;
     })
     .join(" · ");
 }
@@ -1541,7 +1541,7 @@ function setStatus(text, tone) {
 
 function setBusy(isBusy) {
   facilitateBtn.disabled = isBusy;
-  facilitateBtn.textContent = isBusy ? "规划中..." : "✦ 主题规划";
+  facilitateBtn.textContent = isBusy ? "Planning..." : "✦ Plan Topic";
 }
 
 function isNoteTakingActive() {
@@ -1551,7 +1551,7 @@ function isNoteTakingActive() {
 function refreshNoteTakingControls() {
   discussionPane.classList.toggle("paused", isNoteTakingActive());
   pauseBtn.disabled = !activeRun || Boolean(activeNoteCheckpoint);
-  pauseBtn.textContent = isPaused ? "继续讨论" : "暂停标注";
+  pauseBtn.textContent = isPaused ? "Resume Discussion" : "Pause to Annotate";
   addNoteBtn.disabled = !canAddNoteFromSelection(pendingNoteSelection);
   if (activeNoteCheckpoint) {
     renderActiveNoteCheckpoint();
@@ -1609,7 +1609,7 @@ function enqueueNoteCheckpoint(checkpoint) {
 function activateNoteCheckpoint(checkpoint) {
   activeNoteCheckpoint = checkpoint;
   noteCheckpointPanel.hidden = false;
-  setStatus(`待换桌 · ${checkpoint.table_id} R${Number(checkpoint.round_index) + 1}`, "running");
+  setStatus(`Rotation Pending · ${checkpoint.table_id} R${Number(checkpoint.round_index) + 1}`, "running");
   
   // Highlight active checkpoint table card
   document.querySelectorAll(".table-card").forEach(card => card.classList.remove("gated-pulse"));
@@ -1620,9 +1620,9 @@ function activateNoteCheckpoint(checkpoint) {
   }
 
   updateAgentStatus("host", {
-    status: "等待换桌",
-    detail: `${checkpoint.table_id} 已暂停：请完成本轮设计洞察/机会笔记，点击“换桌”后桌长才会生成本轮记忆。`,
-    meta: `第 ${Number(checkpoint.round_index) + 1} 轮`,
+    status: "Waiting To Rotate",
+    detail: `${checkpoint.table_id} is paused. Finish this round's insight and opportunity notes; the host will generate memory after rotation.`,
+    meta: `Round ${Number(checkpoint.round_index) + 1}`,
   });
   ensureRound(checkpoint.table_id, checkpoint.round_index, []);
   refreshNoteTakingControls();
@@ -1652,7 +1652,7 @@ function hideNoteCheckpointPanel() {
   }
   if (continueNotesBtn) {
     continueNotesBtn.disabled = false;
-    continueNotesBtn.textContent = "换桌";
+    continueNotesBtn.textContent = "Rotate Table";
   }
 }
 
@@ -1661,15 +1661,15 @@ function renderActiveNoteCheckpoint() {
   const notes = getNotesForCheckpoint(activeNoteCheckpoint);
   const stats = getNotebookStats(notes);
   const roundLabel = Number(activeNoteCheckpoint.round_index) + 1;
-  const queued = pendingNoteCheckpoints.length ? ` · 另有 ${pendingNoteCheckpoints.length} 桌等待换桌` : "";
+  const queued = pendingNoteCheckpoints.length ? ` · ${pendingNoteCheckpoints.length} more tables waiting to rotate` : "";
   if (noteCheckpointTitle) {
-    noteCheckpointTitle.textContent = `${activeNoteCheckpoint.table_id} · Round ${roundLabel} · 换桌前笔记`;
+    noteCheckpointTitle.textContent = `${activeNoteCheckpoint.table_id} · Round ${roundLabel} · Pre-rotation Notes`;
   }
   if (noteCheckpointDetail) {
-    noteCheckpointDetail.textContent = `请先完成本桌本轮的设计洞察/机会笔记，点击“换桌”后桌长才会结合笔记生成内在记忆、输出结束语，并进入换桌。将提交 ${stats.noteCount} 条笔记 / ${stats.highlightCount} 处高亮${queued}。`;
+    noteCheckpointDetail.textContent = `Finish this table's insight and opportunity notes for the round. After you rotate, the host will use them to generate internal memory and a closing note. ${stats.noteCount} notes / ${stats.highlightCount} highlights will be submitted${queued}.`;
   }
   if (continueNotesBtn) {
-    continueNotesBtn.textContent = notes.length ? `提交 ${stats.noteCount} 条笔记并换桌` : "无笔记，直接换桌";
+    continueNotesBtn.textContent = notes.length ? `Submit ${stats.noteCount} Notes And Rotate` : "Rotate Without Notes";
   }
 }
 
@@ -1678,7 +1678,7 @@ async function submitActiveNoteCheckpoint() {
   const checkpoint = activeNoteCheckpoint;
   const notes = getNotesForCheckpoint(checkpoint).map(noteToPayload);
   continueNotesBtn.disabled = true;
-  continueNotesBtn.textContent = "换桌中...";
+  continueNotesBtn.textContent = "Rotating...";
   try {
     await postJson(`/api/runs/${activeRun.run_id}/note-checkpoint/continue`, {
       checkpoint_id: checkpoint.checkpoint_id,
@@ -1688,8 +1688,8 @@ async function submitActiveNoteCheckpoint() {
       notes,
     });
     updateAgentStatus("host", {
-      status: "生成桌长记忆",
-      detail: `${checkpoint.table_id} 桌长正在结合用户标注笔记更新内在记忆，然后输出本轮结束语。`,
+      status: "Generating Host Memory",
+      detail: `${checkpoint.table_id}'s host is combining user-marked notes into internal memory before closing the round.`,
       meta: `${notes.length} notes · switch table`,
     });
     recordUserAction("notes_submitted", {
@@ -1779,7 +1779,7 @@ function addSelectedNote() {
   const noteId = `note-${++noteSequence}`;
   const highlighted = highlightSelectionRange(range, noteId);
   if (!highlighted?.highlightCount) {
-    addMessage("error", "没有成功标记选中的文字，请重新选择后再加入笔记。");
+    addMessage("error", "The selected text could not be highlighted. Please select it again before adding a note.");
     return;
   }
   const roundBlock = speech.closest("[data-round-index]");
@@ -1795,7 +1795,7 @@ function addSelectedNote() {
       id: noteId,
       text,
       sourceType,
-      speakerName: speech.dataset.speakerName || (sourceType === "harvest" ? "全局总结" : "Unknown speaker"),
+      speakerName: speech.dataset.speakerName || (sourceType === "harvest" ? "Global Harvest" : "Unknown speaker"),
       speakerId: speech.dataset.speakerId || "",
       tableId,
       roundIndex,
@@ -1803,7 +1803,7 @@ function addSelectedNote() {
       speechTargetId: highlighted.element?.id || speech.id,
       highlightCount: highlighted.highlightCount,
       round: Number.isFinite(roundIndex) ? roundIndex + 1 : currentRound,
-      createdAt: new Date().toLocaleTimeString(),
+      createdAt: formatActivityTime(),
     },
   ];
   recordUserAction("note_highlighted", {
@@ -1812,7 +1812,7 @@ function addSelectedNote() {
     sourceType: sourceType || "speech",
     table_id: tableId,
     round_index: Number.isFinite(roundIndex) ? roundIndex : null,
-    speaker_name: speech.dataset.speakerName || (sourceType === "harvest" ? "全局总结" : "Unknown speaker"),
+    speaker_name: speech.dataset.speakerName || (sourceType === "harvest" ? "Global Harvest" : "Unknown speaker"),
     speaker_id: speech.dataset.speakerId || "",
     speech_id: speech.id,
     highlight_count: highlighted.highlightCount,
@@ -1826,7 +1826,7 @@ function addSelectedNote() {
 
 function renderNotebook() {
   const stats = getNotebookStats();
-  notebookCount.textContent = `已记录 ${stats.noteCount} 条笔记 · ${stats.highlightCount} 处高亮`;
+  notebookCount.textContent = `${stats.noteCount} notes · ${stats.highlightCount} highlights`;
   notebookList.innerHTML = "";
   notebookEntries.forEach((entry, index) => {
     const item = document.createElement("button");
@@ -1834,7 +1834,7 @@ function renderNotebook() {
     item.className = "notebook-entry";
     item.dataset.noteTarget = entry.id;
     item.innerHTML = `
-      <div class="notebook-entry-meta">#${index + 1} · ${escapeHtml(entry.tableId || "?")} · ${escapeHtml(entry.speakerName)} · Round ${entry.round || "?"} · ${entry.highlightCount || 0} 处高亮 · ${escapeHtml(entry.createdAt)}</div>
+      <div class="notebook-entry-meta">#${index + 1} · ${escapeHtml(entry.tableId || "?")} · ${escapeHtml(entry.speakerName)} · Round ${entry.round || "?"} · ${entry.highlightCount || 0} highlights · ${escapeHtml(entry.createdAt)}</div>
       <p>${escapeHtml(entry.text)}</p>
     `;
     item.addEventListener("click", () => jumpToNote(entry));
@@ -1924,7 +1924,7 @@ function clearBackground() {
   backgroundContext = "";
   backgroundFilename = "";
   backgroundFileInput.value = "";
-  backgroundSummary.textContent = "未上传背景材料";
+  backgroundSummary.textContent = "No background file uploaded";
   clearBackgroundBtn.hidden = true;
 }
 
@@ -1965,6 +1965,10 @@ function getCurrentActivityRound() {
   return currentRound || 0;
 }
 
+function formatActivityTime() {
+  return new Date().toLocaleTimeString("en-US", { hour12: false });
+}
+
 function getButtonLabel(button) {
   return (button.innerText || button.textContent || button.getAttribute("aria-label") || button.id || "")
     .replace(/\s+/g, " ")
@@ -1974,7 +1978,7 @@ function getButtonLabel(button) {
 function getFinalInsightContents() {
   return [...document.querySelectorAll(".opportunity-grid label")].map((label, index) => ({
     index: index + 1,
-    label: label.querySelector("span")?.textContent?.trim() || `机会 ${index + 1}`,
+    label: label.querySelector("span")?.textContent?.trim() || `Opportunity ${index + 1}`,
     content: label.querySelector("textarea")?.value.trim() || "",
   }));
 }
@@ -2104,15 +2108,11 @@ function renderMarkdownLite(markdown) {
 }
 
 const designOpportunityTerms = [
-  "设计机会",
-  "新的设计机会",
-  "新机会",
-  "机会假设",
-  "机会线索",
-  "潜在机会",
-  "机会",
   "design opportunity",
+  "new design opportunity",
   "opportunity hypothesis",
+  "opportunity signal",
+  "potential opportunity",
   "opportunity",
   "opportunities",
 ];

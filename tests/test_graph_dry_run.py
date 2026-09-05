@@ -25,7 +25,7 @@ async def test_world_cafe_dry_run_completes_all_rounds() -> None:
     assert len(final_state["table_round_outputs"]) == 8
     assert len(final_state["round_summaries"]) == 2
     assert len(final_state["rotation_history"]) == 1
-    assert "设计洞察" in final_state["harvest"]["content"]
+    assert "Design Insights" in final_state["harvest"]["content"]
     assert "structured_harvest" in final_state["harvest"]
     assert "speaking_agent_history" in final_state["harvest"]
     assert "round_summaries" not in final_state["harvest"]
@@ -70,7 +70,7 @@ async def test_note_checkpoint_notes_are_passed_to_host_synthesis() -> None:
         return [
             {
                 "id": "note-1",
-                "text": "边缘用户在夜间流程里反复卡住，可能是一个设计机会。",
+                "text": "Edge users repeatedly get stuck in the night flow, which may reveal a design opportunity.",
                 "table_id": table_id,
                 "round_index": round_index,
                 "speaker_name": "Agent One",
@@ -93,9 +93,9 @@ async def test_note_checkpoint_notes_are_passed_to_host_synthesis() -> None:
     final_state = await graph.ainvoke(state)
 
     assert captured_host_prompts
-    assert "边缘用户在夜间流程里反复卡住" in captured_host_prompts[0]
+    assert "Edge users repeatedly get stuck" in captured_host_prompts[0]
     output = final_state["table_round_outputs"][0]
-    assert output["user_notes"][0]["text"].startswith("边缘用户")
+    assert output["user_notes"][0]["text"].startswith("Edge users")
     memory_round = final_state["table_memories"]["table_01"]["rounds"][0]
     assert memory_round["user_notes"][0]["speaker_id"] == "agent_01"
 
@@ -107,7 +107,7 @@ async def test_single_speaker_failure_does_not_stop_discussion() -> None:
             self.speaker_calls = 0
 
         async def agenerate(self, system: str, user: str) -> str:
-            if "现在轮到你发言" in user:
+            if "It is your turn" in user:
                 self.speaker_calls += 1
                 if self.speaker_calls == 1:
                     raise RuntimeError("temporary speaker failure")
@@ -237,16 +237,16 @@ async def test_packet_generation_failure_still_routes_speaking_agents() -> None:
 async def test_harvest_output_is_formatted_when_prompt_limits_are_exceeded() -> None:
     class LongOutputLLM:
         async def agenerate(self, system: str, user: str) -> str:
-            if "全局 harvest" in system:
-                return "全" * 600
-            if "桌长" in system:
+            if "global harvest" in system.lower():
+                return "x" * 600
+            if "table host" in system.lower():
                 return (
-                    "## synthesis\n摘要\n\n"
-                    "## key_insights\n- 洞察\n\n"
-                    "## open_questions\n- 问题\n\n"
-                    "## tensions\n- 张力"
+                    "## synthesis\nSummary\n\n"
+                    "## key_insights\n- Insight\n\n"
+                    "## open_questions\n- Question\n\n"
+                    "## tensions\n- Tension"
                 )
-            return "发" * 350
+            return "x" * 350
 
     state = create_initial_state(
         questions=["q1"],
@@ -263,8 +263,8 @@ async def test_harvest_output_is_formatted_when_prompt_limits_are_exceeded() -> 
     assert len(contribution["content"]) == 350
     harvest_content = final_state["harvest"]["content"]
     assert len(harvest_content) <= 500
-    assert harvest_content.startswith("设计洞察")
-    assert "3、不超过三个后续的设计方向" in harvest_content
+    assert harvest_content.startswith("Design Insights")
+    assert "3. Up to three next design directions" in harvest_content
 
 
 @pytest.mark.asyncio
@@ -301,7 +301,7 @@ async def test_speaking_agent_trace_marks_background_context() -> None:
         table_count=1,
         seats_per_table=2,
         speeches_per_agent=1,
-        background_context="# 背景\n这是一段项目材料。",
+        background_context="# Background\nThis is a piece of project material.",
     )
     graph = build_world_cafe_graph(DryRunCafeLLM())
 
@@ -309,7 +309,7 @@ async def test_speaking_agent_trace_marks_background_context() -> None:
 
     contribution = next(event for event in final_state["trace"] if event["stage"] == "agent_contribution")
     assert contribution["metadata"]["has_background_context"] is True
-    assert contribution["metadata"]["background_context_chars"] == len("# 背景\n这是一段项目材料。")
+    assert contribution["metadata"]["background_context_chars"] == len("# Background\nThis is a piece of project material.")
 
 
 def test_prompts_limit_agent_turns_and_global_harvest_length() -> None:
@@ -324,19 +324,19 @@ def test_prompts_limit_agent_turns_and_global_harvest_length() -> None:
         "table_id": "table_01",
         "question": "q1",
         "host_id": "agent_02",
-        "living_summary": "table_01 累积了所有轮讨论的活记忆。",
+        "living_summary": "table_01 has accumulated living memory from all discussion rounds.",
         "key_insights": [],
         "open_questions": [],
         "tensions": [],
         "formatmemory": [
             {
                 "round_index": 1,
-                "repeated_themes": ["跨轮重复主题"],
-                "minority_inspiring_views": ["少数启发观点"],
-                "unresolved_tensions": ["持续张力"],
+                "repeated_themes": ["cross-round recurring theme"],
+                "minority_inspiring_views": ["minority inspiring view"],
+                "unresolved_tensions": ["persistent tension"],
             }
         ],
-        "next_round_question_seeds": ["后续追问种子"],
+        "next_round_question_seeds": ["follow-up question seed"],
         "rounds": [],
     }
 
@@ -348,20 +348,20 @@ def test_prompts_limit_agent_turns_and_global_harvest_length() -> None:
         table_agents=[agent],
         memory=memory,
         table_spec={
-            "parent_question": "用户大问题",
+            "parent_question": "User's larger question",
             "lens": "reframing",
             "guiding_question": "q1",
         },
         conversation=[],
-        background_context="背景上下文",
+        background_context="Background context",
         turn_index=0,
         cycle_index=0,
     )
     _, host_opening_user = host_opening_prompt(
         question="q1",
-        parent_question="用户大问题",
+        parent_question="User's larger question",
         memory=memory,
-        background_context="背景上下文",
+        background_context="Background context",
     )
     _, host_synthesis_user = host_synthesis_prompt(
         table_id="table_01",
@@ -370,12 +370,12 @@ def test_prompts_limit_agent_turns_and_global_harvest_length() -> None:
         host=agent,
         memory=memory,
         table_spec={
-            "parent_question": "用户大问题",
+            "parent_question": "User's larger question",
             "lens": "reframing",
             "guiding_question": "q1",
         },
-        contributions=["本轮发言"],
-        background_context="背景上下文",
+        contributions=["This round's contribution"],
+        background_context="Background context",
     )
     speaking_history = [
         {
@@ -386,14 +386,14 @@ def test_prompts_limit_agent_turns_and_global_harvest_length() -> None:
                 {
                     "agent_id": "agent_01",
                     "agent_name": "A",
-                    "content": "这是 speaking agent 的原始历史发言。",
+                    "content": "This is the original historical contribution from a speaking agent.",
                     "turn_index": 0,
                     "cycle_index": 0,
                 }
             ],
             "user_notes": [
                 {
-                    "text": "用户标记的本轮关键笔记。",
+                    "text": "A key note marked by the user this round.",
                     "speaker_name": "A",
                     "speaker_id": "agent_01",
                     "speech_id": "speech_01",
@@ -403,43 +403,43 @@ def test_prompts_limit_agent_turns_and_global_harvest_length() -> None:
     ]
     _, harvest_user = global_harvest_prompt({"table_01": memory}, speaking_history)
 
-    assert "100字以内" in contribution_user
-    assert "背景材料" in contribution_user
-    assert "背景上下文" in contribution_user
-    assert "用户原始大问题：用户大问题" in contribution_user
-    assert "本桌 table_spec" in contribution_user
+    assert "under 100 English words" in contribution_user
+    assert "Background material" in contribution_user
+    assert "Background context" in contribution_user
+    assert "Original user request: User's larger question" in contribution_user
+    assert "Table spec" in contribution_user
     assert "reframing" in contribution_user
-    assert "用户原始大问题：用户大问题" in host_opening_user
-    assert "只提出2-3个可直接开启讨论的简短开放问句" in host_opening_user
-    assert "【开场白，说明本轮讨论的关注点（10字以内）】" in host_opening_user
-    assert "- 【问题一（一句话引导，不要提供过多信息）】" in host_opening_user
+    assert "Original user request: User's larger question" in host_opening_user
+    assert "only 2-3 brief open questions" in host_opening_user
+    assert "[Opening phrase stating this round's focus in under 10 English words]" in host_opening_user
+    assert "- [Question 1, one sentence, no extra setup]" in host_opening_user
     assert "background_context" in host_opening_user
-    assert "桌长画像" not in host_opening_user
-    assert "table_spec：" not in host_opening_user
+    assert "Host profile" not in host_opening_user
+    assert "table_spec:" not in host_opening_user
     assert '"tablememory_usage_description"' in host_synthesis_user
     assert TABLEMEMORY_USAGE_DESCRIPTION in host_synthesis_user
-    assert "1200字以内" in harvest_user
-    speaking_index = harvest_user.index("所有 speaking agents 的历史对话原文")
-    questions_index = harvest_user.index("所有桌子的讨论问题")
-    tablememory_index = harvest_user.index("所有桌子的 tablememory")
-    notes_index = harvest_user.index("用户每轮标记的笔记")
+    assert "under 1200 English words" in harvest_user
+    speaking_index = harvest_user.index("original dialogue history from all speaking agents")
+    questions_index = harvest_user.index("discussion questions for all tables")
+    tablememory_index = harvest_user.index("tablememory for all tables")
+    notes_index = harvest_user.index("user-marked notes from each round")
     assert speaking_index < questions_index < tablememory_index < notes_index
-    assert "作为 harvest 主证据（优先级最高）" in harvest_user
-    assert "所有桌子的 tablememory" in harvest_user
-    assert "table_01 累积了所有轮讨论的活记忆。" in harvest_user
-    assert "跨轮重复主题" in harvest_user
-    assert "所有 speaking agents 的历史对话原文" in harvest_user
-    assert "A (agent_01)：这是 speaking agent 的原始历史发言。" in harvest_user
-    assert "用户标记的本轮关键笔记。" in harvest_user
-    assert "轮次摘要：" not in harvest_user
-    assert "桌长记忆：" not in harvest_user
-    assert "设计洞察：" in harvest_user
-    assert "### 洞察 1" in harvest_user
-    assert "### 洞察 2" in harvest_user
-    assert "### 洞察 3" in harvest_user
-    assert "1、用户主要需求的提取" in harvest_user
-    assert "2、设计问题的重新界定" in harvest_user
-    assert "3、不超过三个后续的设计方向" in harvest_user
+    assert "primary harvest evidence with the highest priority" in harvest_user
+    assert "tablememory for all tables" in harvest_user
+    assert "table_01 has accumulated living memory" in harvest_user
+    assert "cross-round recurring theme" in harvest_user
+    assert "original dialogue history from all speaking agents" in harvest_user
+    assert "A (agent_01): This is the original historical contribution from a speaking agent." in harvest_user
+    assert "A key note marked by the user this round." in harvest_user
+    assert "Round summary:" not in harvest_user
+    assert "Host memory:" not in harvest_user
+    assert "Design Insights:" in harvest_user
+    assert "### Insight 1" in harvest_user
+    assert "### Insight 2" in harvest_user
+    assert "### Insight 3" in harvest_user
+    assert "1. User need" in harvest_user
+    assert "2. Reframed design problem" in harvest_user
+    assert "3. Up to three next design directions" in harvest_user
 
 
 def test_create_initial_state_fills_missing_agents_without_duplicate_ids() -> None:
@@ -495,15 +495,15 @@ async def test_context_orchestration_generates_host_memory_and_pockets() -> None
             "table_01": {
                 "table_id": "table_01",
                 "expert_skill": "liu-long",
-                "expert_rationale": "人因与用户研究视角适合本桌。",
+                "expert_rationale": "Human factors and user research are suitable for this table.",
                 "lens": "user_journey",
                 "guiding_question": "q1",
-                "round_subquestions": {"round_1": ["观察什么？"], "round_2": ["有什么张力？"]},
+                "round_subquestions": {"round_1": ["What should we observe?"], "round_2": ["What tensions appear?"]},
             },
             "table_02": {
                 "table_id": "table_02",
                 "expert_skill": "wang-meng",
-                "expert_rationale": "AI 与知识组织视角适合本桌。",
+                "expert_rationale": "AI and knowledge organization are suitable for this table.",
                 "lens": "future_scenario",
                 "guiding_question": "q2",
             },
@@ -542,9 +542,9 @@ async def test_visible_outputs_are_natural_and_bold_design_opportunities() -> No
             if "## opening" in user:
                 return (
                     "## opening\n"
-                    "这里有一个设计机会：先把边缘用户的真实阻塞点听清楚。\n\n"
+                    "There is a design opportunity here: first listen closely to real blockers for edge users.\n\n"
                     "## question_seeds\n"
-                    "- 哪个边缘情境最能改变问题理解？"
+                    "- Which edge situation could most change the problem understanding?"
                 )
             if '"formatmemory"' in user:
                 return """
@@ -552,11 +552,11 @@ async def test_visible_outputs_are_natural_and_bold_design_opportunities() -> No
   "formatmemory": {
     "table_question": "q1",
     "round_index": 1,
-    "repeated_themes": ["设计机会来自边缘场景与主流旅程之间的落差。"],
-    "minority_inspiring_views": ["边缘案例改变了问题边界。"],
-    "unresolved_tensions": ["效率优先与包容性探索之间存在张力。"]
+    "repeated_themes": ["Design opportunities come from the gap between edge situations and mainstream journeys."],
+    "minority_inspiring_views": ["Edge cases change the problem boundary."],
+    "unresolved_tensions": ["There is tension between efficiency-first delivery and inclusive exploration."]
   },
-  "next_round_question_seeds": ["如何验证这个机会假设？"]
+  "next_round_question_seeds": ["How should this opportunity hypothesis be validated?"]
 }
 """
             if '"agent_generated_memory"' in user:
@@ -565,7 +565,7 @@ async def test_visible_outputs_are_natural_and_bold_design_opportunities() -> No
   "agent": {"id": "agent_02", "name": "Agent Two", "role": "participant", "skills": ["edge cases"]},
   "agent_generated_memory": {
     "skill_lens": "edge cases",
-    "personal_insight": "边缘案例可能解释当前桌张力"
+    "personal_insight": "Edge cases may explain this table's tension."
   }
 }
 """
@@ -573,15 +573,15 @@ async def test_visible_outputs_are_natural_and_bold_design_opportunities() -> No
                 return """
 {
   "pattern_channel": [],
-  "weak_signal_channel": [{"signal": "边缘案例暴露设计机会", "from_table": "table_01"}],
+  "weak_signal_channel": [{"signal": "Edge cases reveal a design opportunity", "from_table": "table_01"}],
   "cross_table_tensions": [],
-  "opportunity_hypotheses": [{"hypothesis": "用边缘案例验证机会假设"}],
+  "opportunity_hypotheses": [{"hypothesis": "Use edge cases to validate the opportunity hypothesis"}],
   "reframed_design_questions": [],
   "next_learning_experiments": [],
-  "display_markdown": "设计洞察：\\n1、用户主要需求的提取：用户需要默认旅程覆盖边缘场景。\\n2、设计问题的重新界定：如何把边缘案例暴露的设计机会转化为可验证旅程。\\n3、不超过三个后续的设计方向：\\n- 重新定义默认旅程。"
+  "display_markdown": "Design Insights:\\n### Insight 1\\n1. User need: Users need default journeys to cover edge situations.\\n2. Reframed design problem: How might design opportunities exposed by edge cases become testable journeys?\\n3. Up to three next design directions:\\n- Redefine the default journey.\\n### Insight 2\\n1. User need: Teams need clearer evidence about edge blockers.\\n2. Reframed design problem: How might evidence from edge contexts reshape mainstream service assumptions?\\n3. Up to three next design directions:\\n- Create an edge-case evidence board.\\n### Insight 3\\n1. User need: Stakeholders need shared language for risk and inclusion.\\n2. Reframed design problem: How might inclusion criteria guide practical trade-offs?\\n3. Up to three next design directions:\\n- Test an inclusion review checkpoint."
 }
 """
-            return "我听到一个设计机会：把边缘用户的断点当成下一轮验证线索。"
+            return "I hear a design opportunity: treat edge-user breakdowns as validation cues for the next round."
 
     state = create_initial_state(
         questions=["q1"],
@@ -620,7 +620,7 @@ async def test_host_record_display_never_exposes_json_memory() -> None:
                 return """
 {
   "formatmemory": {
-    "repeated_themes": ["这段 JSON 少了结尾，所以不能原样暴露"]
+    "repeated_themes": ["This JSON is missing its ending, so it must not be exposed as-is"]
 """
             return await super().agenerate(system, user)
 
@@ -658,7 +658,7 @@ async def test_json_harvest_is_stored_as_structured_harvest() -> None:
   "next_design_directions": ["small probe"],
   "reframed_design_questions": ["How might the system keep weak signals alive?"],
   "next_learning_experiments": [{"experiment": "small probe", "what_to_observe": "signal quality", "why_now": "before convergence"}],
-  "display_markdown": "设计洞察：\\n1、用户主要需求的提取：shared need\\n2、设计问题的重新界定：How might the system keep weak signals alive?\\n3、不超过三个后续的设计方向：\\n- small probe"
+  "display_markdown": "Design Insights:\\n### Insight 1\\n1. User need: shared need\\n2. Reframed design problem: How might the system keep weak signals alive?\\n3. Up to three next design directions:\\n- small probe\\n### Insight 2\\n1. User need: shared need\\n2. Reframed design problem: How might the system keep weak signals alive?\\n3. Up to three next design directions:\\n- small probe\\n### Insight 3\\n1. User need: shared need\\n2. Reframed design problem: How might the system keep weak signals alive?\\n3. Up to three next design directions:\\n- small probe"
 }
 """
             return await super().agenerate(system, user)
@@ -675,7 +675,7 @@ async def test_json_harvest_is_stored_as_structured_harvest() -> None:
     final_state = await graph.ainvoke(state)
 
     harvest = final_state["harvest"]
-    assert harvest["content"].startswith("设计洞察")
+    assert harvest["content"].startswith("Design Insights")
     assert harvest["structured_harvest"]["user_needs"] == ["shared need"]
     assert harvest["structured_harvest"]["next_design_directions"] == ["small probe"]
     assert harvest["structured_harvest"]["pattern_channel"][0]["pattern"] == "shared pattern"
@@ -683,14 +683,14 @@ async def test_json_harvest_is_stored_as_structured_harvest() -> None:
 
 
 def test_json_harvest_with_unknown_fields_uses_design_insight_template() -> None:
-    content = '{"summary": "模型返回了非约定字段，但仍有可读 harvest 内容。"}'
+    content = '{"summary": "The model returned unexpected fields, but the harvest content is still readable."}'
     structured = _parse_structured_harvest(content)
 
     display = _harvest_display_content(content, structured)
 
-    assert display.startswith("设计洞察")
+    assert display.startswith("Design Insights")
     assert "Shared Patterns" not in display
-    assert "1、用户主要需求的提取：暂无" in display
+    assert "1. User need: None yet" in display
 
 
 def test_harvest_display_builds_three_structured_design_insights() -> None:
@@ -698,19 +698,19 @@ def test_harvest_display_builds_three_structured_design_insights() -> None:
 {
   "design_insights": [
     {
-      "user_need": "夜间服务需要更低认知负担。",
-      "reframed_design_problem": "如何让夜间求助流程在压力状态下也能被理解。",
-      "design_direction": "建立夜间一键求助原型并观察误触率。"
+      "user_need": "Night services need lower cognitive load.",
+      "reframed_design_problem": "How might the night-help flow remain understandable under stress?",
+      "design_direction": "Build a one-tap night-help prototype and observe false-trigger rates."
     },
     {
-      "user_need": "照护者需要快速理解状态变化。",
-      "reframed_design_problem": "如何把零散状态信号转成可行动提醒。",
-      "design_direction": "测试照护者分级提醒看板。"
+      "user_need": "Caregivers need to quickly understand status changes.",
+      "reframed_design_problem": "How might scattered status signals become actionable alerts?",
+      "design_direction": "Test a tiered caregiver alert dashboard."
     },
     {
-      "user_need": "社区志愿者需要明确介入边界。",
-      "reframed_design_problem": "如何定义志愿支持与专业服务之间的交接点。",
-      "design_direction": "共创一套志愿者转介脚本。"
+      "user_need": "Community volunteers need clear boundaries for intervention.",
+      "reframed_design_problem": "How might handoff points between volunteer support and professional services be defined?",
+      "design_direction": "Co-create a volunteer referral script."
     }
   ]
 }
@@ -719,32 +719,32 @@ def test_harvest_display_builds_three_structured_design_insights() -> None:
     display = _harvest_display_content(content, structured)
 
     assert len(structured["design_insights"]) == 3
-    assert display.count("### 洞察") == 3
-    assert "夜间服务需要更低认知负担" in display
-    assert "共创一套志愿者转介脚本" in display
+    assert display.count("### Insight") == 3
+    assert "Night services need lower cognitive load" in display
+    assert "Co-create a volunteer referral script" in display
 
 
 def test_legacy_empty_harvest_template_is_not_displayed() -> None:
     content = """
 Shared Patterns
-暂无
+None yet
 
 Weak Signals
-暂无
+None yet
 
 Cross-table Tensions
-暂无
+None yet
 
 Reframed Questions
-暂无
+None yet
 
 Next Experiments
-暂无
+None yet
 """
     structured = _parse_structured_harvest(content)
     display = _harvest_display_content(content, structured)
 
-    assert display.startswith("设计洞察")
+    assert display.startswith("Design Insights")
     assert "Shared Patterns" not in display
     assert "Weak Signals" not in display
-    assert "3、不超过三个后续的设计方向" in display
+    assert "3. Up to three next design directions" in display

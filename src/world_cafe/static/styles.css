@@ -14,8 +14,8 @@
   --blue: #63b0df;
   --blue-soft: rgba(99, 176, 223, 0.12);
   --shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
-  --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-display: 'Space Grotesk', sans-serif;
+  --font-sans: "Helvetica Neue", Helvetica, "Microsoft YaHei", Arial, sans-serif;
+  --font-display: "Avenir Next", "Helvetica Neue", Helvetica, "Microsoft YaHei", Arial, sans-serif;
 }
 
 * {
@@ -129,7 +129,7 @@ h1, h2, h3, h4, p {
 
 h1, h2, h3, h4 {
   font-family: var(--font-display);
-  letter-spacing: -0.02em;
+  letter-spacing: 0;
 }
 
 .badge {

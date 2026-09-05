@@ -302,8 +302,9 @@ def _make_table_discussion_node(llm: CafeLLM, pause_check: PauseCheck, note_chec
                         "agent_id": agent["id"],
                         "agent_name": agent["name"],
                         "content": (
-                            f"（{agent['name']} 本次发言生成失败，系统已跳过这次发言并继续下一位。"
-                            f"错误：{error_message[:180]}）"
+                            f"({agent['name']}'s contribution failed to generate. "
+                            f"The system skipped this turn and continued to the next speaker. "
+                            f"Error: {error_message[:180]})"
                         ),
                         "turn_index": turn_index,
                         "cycle_index": cycle_index,
@@ -311,7 +312,7 @@ def _make_table_discussion_node(llm: CafeLLM, pause_check: PauseCheck, note_chec
                     }
                 contributions.append(contribution)
                 conversation.append(
-                    f"{contribution['agent_name']}：{contribution['content']}"
+                    f"{contribution['agent_name']}: {contribution['content']}"
                 )
                 event = make_event(
                     "agent_contribution",
@@ -650,14 +651,14 @@ def _parse_structured_harvest(content: str) -> dict[str, Any]:
         reframed_questions = _extract_legacy_harvest_items(content, "Reframed Questions")
         next_experiments = _extract_legacy_harvest_items(content, "Next Experiments")
         fallback_harvest = {
-            "user_needs": _extract_design_insight_items(content, "1、用户主要需求的提取")
+            "user_needs": _extract_design_insight_items(content, "1. User need")
             or pattern_channel
             or weak_signal_channel,
-            "reframed_design_problem": _extract_design_insight_text(content, "2、设计问题的重新界定")
+            "reframed_design_problem": _extract_design_insight_text(content, "2. Reframed design problem")
             or _first_text(reframed_questions, cross_table_tensions),
             "next_design_directions": _limit_items(
-                _extract_design_insight_items(content, "3、不超过三个后续的设计方向")
-                or _extract_design_insight_items(content, "3、后续的设计方向")
+                _extract_design_insight_items(content, "3. Up to three next design directions")
+                or _extract_design_insight_items(content, "3. Next design directions")
                 or next_experiments,
                 3,
             ),
@@ -688,21 +689,18 @@ def _parse_structured_harvest(content: str) -> dict[str, Any]:
             data.get("user_needs")
             or data.get("primary_user_needs")
             or data.get("main_user_needs")
-            or data.get("用户主要需求的提取")
         )
         or pattern_items
         or weak_signal_items,
         "reframed_design_problem": _coerce_text(
             data.get("reframed_design_problem")
             or data.get("design_problem_reframe")
-            or data.get("设计问题的重新界定")
         )
         or _first_text(reframed_question_items, tension_items),
         "next_design_directions": _limit_items(
             _coerce_items(
                 data.get("next_design_directions")
                 or data.get("design_directions")
-                or data.get("后续的设计方向")
             )
             or next_experiment_items,
             3,
@@ -742,26 +740,26 @@ def _harvest_display_content(content: str, structured_harvest: dict[str, Any]) -
 
 
 def _format_structured_harvest_markdown(harvest: dict[str, Any]) -> str:
-    lines = ["设计洞察："]
+    lines = ["Design Insights:"]
     for index, insight in enumerate(_design_insights_from_harvest(harvest), start=1):
         lines.extend(
             [
                 "",
-                f"### 洞察 {index}",
-                f"1、用户主要需求的提取：{_coerce_text(insight.get('user_need')) or '暂无'}",
-                f"2、设计问题的重新界定：{_coerce_text(insight.get('reframed_design_problem')) or '暂无'}",
-                f"3、不超过三个后续的设计方向：{_coerce_text(insight.get('design_direction')) or '暂无'}",
+                f"### Insight {index}",
+                f"1. User need: {_coerce_text(insight.get('user_need')) or 'None yet'}",
+                f"2. Reframed design problem: {_coerce_text(insight.get('reframed_design_problem')) or 'None yet'}",
+                f"3. Up to three next design directions: {_coerce_text(insight.get('design_direction')) or 'None yet'}",
             ]
         )
     return "\n".join(lines)
 
 
 def _is_design_insight_markdown(text: str) -> bool:
-    return all(marker in text for marker in ("设计洞察", "用户主要需求", "设计问题", "设计方向"))
+    return all(marker in text for marker in ("Design Insights", "User need", "Reframed design problem", "design direction"))
 
 
 def _is_three_design_insight_markdown(text: str) -> bool:
-    return _is_design_insight_markdown(text) and text.count("### 洞察") >= 3
+    return _is_design_insight_markdown(text) and text.count("### Insight") >= 3
 
 
 def _design_insights_from_harvest(harvest: dict[str, Any]) -> list[dict[str, str]]:
@@ -796,19 +794,16 @@ def _normalize_design_insight_list(value: object) -> list[dict[str, str]]:
                         item.get("user_need"),
                         item.get("user_needs"),
                         item.get("need"),
-                        item.get("用户主要需求的提取"),
                     ),
                     "reframed_design_problem": _first_text(
                         item.get("reframed_design_problem"),
                         item.get("design_problem_reframe"),
                         item.get("problem"),
-                        item.get("设计问题的重新界定"),
                     ),
                     "design_direction": _first_text(
                         item.get("design_direction"),
                         item.get("next_design_direction"),
                         item.get("direction"),
-                        item.get("后续的设计方向"),
                     ),
                 }
             )
@@ -818,28 +813,28 @@ def _normalize_design_insight_list(value: object) -> list[dict[str, str]]:
                 insights.append(
                     {
                         "user_need": text,
-                        "reframed_design_problem": "暂无",
-                        "design_direction": "暂无",
+                        "reframed_design_problem": "None yet",
+                        "design_direction": "None yet",
                     }
                 )
-    return [insight for insight in insights if any(value != "暂无" and value for value in insight.values())]
+    return [insight for insight in insights if any(value != "None yet" and value for value in insight.values())]
 
 
 def _pad_design_insights(insights: list[dict[str, str]]) -> list[dict[str, str]]:
     normalized = [
         {
-            "user_need": _coerce_text(insight.get("user_need")) or "暂无",
-            "reframed_design_problem": _coerce_text(insight.get("reframed_design_problem")) or "暂无",
-            "design_direction": _coerce_text(insight.get("design_direction")) or "暂无",
+            "user_need": _coerce_text(insight.get("user_need")) or "None yet",
+            "reframed_design_problem": _coerce_text(insight.get("reframed_design_problem")) or "None yet",
+            "design_direction": _coerce_text(insight.get("design_direction")) or "None yet",
         }
         for insight in insights[:3]
     ]
     while len(normalized) < 3:
         normalized.append(
             {
-                "user_need": "暂无",
-                "reframed_design_problem": "暂无",
-                "design_direction": "暂无",
+                "user_need": "None yet",
+                "reframed_design_problem": "None yet",
+                "design_direction": "None yet",
             }
         )
     return normalized
@@ -847,7 +842,7 @@ def _pad_design_insights(insights: list[dict[str, str]]) -> list[dict[str, str]]
 
 def _pick_indexed_or_first(items: list[str], index: int) -> str:
     if not items:
-        return "暂无"
+        return "None yet"
     if index < len(items):
         return items[index]
     return items[0]
@@ -896,25 +891,25 @@ def _extract_plain_heading_section(content: str, heading: str) -> str:
 
 
 def _without_empty_placeholders(items: list[str]) -> list[str]:
-    placeholders = {"暂无", "无", "none", "n/a", "na", "null", "-"}
+    placeholders = {"none", "none yet", "n/a", "na", "null", "-"}
     return [item for item in (str(item).strip() for item in items) if item and item.lower() not in placeholders]
 
 
 def _extract_design_insight_text(content: str, label: str) -> str:
-    pattern = re.compile(rf"{re.escape(label)}\s*[:：]?\s*(.*?)(?=\n\s*[123]、|\Z)", re.DOTALL)
+    pattern = re.compile(rf"{re.escape(label)}\s*:?\s*(.*?)(?=\n\s*[123]\.\s|\Z)", re.DOTALL)
     match = pattern.search(content)
     if not match:
         return ""
     lines = [line.strip() for line in match.group(1).splitlines() if line.strip()]
     lines = [line[2:].strip() if line.startswith(("- ", "* ")) else line for line in lines]
-    return "；".join(lines).strip()
+    return "; ".join(lines).strip()
 
 
 def _extract_design_insight_items(content: str, label: str) -> list[str]:
     text = _extract_design_insight_text(content, label)
     if not text:
         return []
-    return [item.strip() for item in re.split(r"[；;]\s*", text) if item.strip()]
+    return [item.strip() for item in re.split(r"[;]\s*", text) if item.strip()]
 
 
 def _coerce_items(value: object) -> list[str]:
@@ -928,13 +923,13 @@ def _coerce_text(value: object) -> str:
     if value in ("", None, [], {}):
         return ""
     if isinstance(value, list):
-        return "；".join(_coerce_items(value))
+        return "; ".join(_coerce_items(value))
     return _compact_item(value).strip()
 
 
 def _inline_items(value: object) -> str:
     items = _coerce_items(value)
-    return "；".join(items) if items else "暂无"
+    return "; ".join(items) if items else "None yet"
 
 
 def _limit_items(items: list[str], limit: int) -> list[str]:
@@ -958,7 +953,7 @@ def _limit_harvest_display(text: str, limit: int = 1200) -> str:
 
 def _markdown_items(value: object) -> str:
     if not value:
-        return "- 暂无"
+        return "- None yet"
     if isinstance(value, list):
         return "\n".join(f"- {_compact_item(item)}" for item in value)
     return f"- {_compact_item(value)}"
@@ -1056,7 +1051,7 @@ def _host_memory_snapshot(memory: TableMemory, update: dict[str, Any] | None = N
             or TABLEMEMORY_USAGE_DESCRIPTION
         ),
         "living_summary": _limit_visible_text(
-            str(update.get("synthesis") or _formatmemory_summary(current) or memory.get("living_summary") or "暂无。"),
+            str(update.get("synthesis") or _formatmemory_summary(current) or memory.get("living_summary") or "None yet."),
             180,
         ),
         "formatmemory": current,
@@ -1089,7 +1084,7 @@ def _speaker_memory_snapshot(
     agent_memory = packet.get("agent_generated_memory")
     return {
         "kind": "speaking_agent",
-        "bridge_intent": _limit_visible_text(_bridge_intent_from_memory(agent_memory) or "暂无迁移记忆。", 180),
+        "bridge_intent": _limit_visible_text(_bridge_intent_from_memory(agent_memory) or "No migration memory yet.", 180),
         "agent_generated_memory": _compact_memory_value(agent_memory),
     }
 
@@ -1114,16 +1109,16 @@ def _format_host_record_display(memory_update: dict[str, Any], fallback: str) ->
         sections: list[str] = []
         repeated = _natural_list(formatmemory.get("repeated_themes"))
         if repeated:
-            sections.append("## 重复主题\n" + _markdown_items(repeated))
+            sections.append("## Recurring Themes\n" + _markdown_items(repeated))
         minority = _natural_list(formatmemory.get("minority_inspiring_views"))
         if minority:
-            sections.append("## 少数启发\n" + _markdown_items(minority))
+            sections.append("## Minority Signals\n" + _markdown_items(minority))
         tensions = _natural_list(formatmemory.get("unresolved_tensions"))
         if tensions:
-            sections.append("## 未解张力\n" + _markdown_items(tensions))
+            sections.append("## Unresolved Tensions\n" + _markdown_items(tensions))
         seeds = _natural_list(memory_update.get("next_round_question_seeds"))
         if seeds:
-            sections.append("## 带走\n" + _markdown_items(seeds))
+            sections.append("## Carry Forward\n" + _markdown_items(seeds))
         display = "\n\n".join(sections).strip()
         if display:
             return emphasize_design_opportunities(display)
@@ -1131,51 +1126,51 @@ def _format_host_record_display(memory_update: dict[str, Any], fallback: str) ->
     sections: list[str] = []
     key_insights = _natural_list(memory_update.get("key_insights"))
     if key_insights:
-        sections.append("## 洞察关键词\n" + _markdown_items(key_insights))
+        sections.append("## Insight Keywords\n" + _markdown_items(key_insights))
 
     stable_patterns = _natural_list(memory_update.get("stable_patterns"))
     if stable_patterns:
-        sections.append("## 暂时成形\n" + _markdown_items(stable_patterns))
+        sections.append("## Settled For Now\n" + _markdown_items(stable_patterns))
 
     weak_patterns = _natural_list(memory_update.get("incomplete_or_weak_patterns"))
     if weak_patterns:
-        sections.append("## 仍不完善\n" + _markdown_items(weak_patterns))
+        sections.append("## Still Underdeveloped\n" + _markdown_items(weak_patterns))
 
     contested_points = _natural_list(memory_update.get("contested_points"))
     if contested_points:
-        sections.append("## 冲突观点\n" + _markdown_items(contested_points))
+        sections.append("## Contested Views\n" + _markdown_items(contested_points))
 
     tensions = _natural_list(memory_update.get("tensions"))
     if tensions:
-        sections.append("## 张力关键词\n" + _markdown_items(tensions))
+        sections.append("## Tension Keywords\n" + _markdown_items(tensions))
 
     blind_spots = _natural_list(memory_update.get("blind_spots_or_ambiguities"))
     if blind_spots:
-        sections.append("## 盲点/模糊处\n" + _markdown_items(blind_spots))
+        sections.append("## Blind Spots / Ambiguities\n" + _markdown_items(blind_spots))
 
     cumulative_evolution = _natural_text(memory_update.get("cumulative_pattern_evolution"))
     if cumulative_evolution:
-        sections.append("## 跨轮演化\n" + cumulative_evolution)
+        sections.append("## Cross-round Evolution\n" + cumulative_evolution)
 
     recurring_patterns = _natural_list(memory_update.get("recurring_patterns_across_rounds"))
     if recurring_patterns:
-        sections.append("## 跨轮重复模式\n" + _markdown_items(recurring_patterns))
+        sections.append("## Cross-round Recurring Patterns\n" + _markdown_items(recurring_patterns))
 
     emerging_signals = _natural_list(memory_update.get("emerging_or_fading_signals"))
     if emerging_signals:
-        sections.append("## 变化中的信号\n" + _markdown_items(emerging_signals))
+        sections.append("## Emerging Or Fading Signals\n" + _markdown_items(emerging_signals))
 
     unresolved_over_time = _natural_list(memory_update.get("unresolved_tensions_over_time"))
     if unresolved_over_time:
-        sections.append("## 持续未解张力\n" + _markdown_items(unresolved_over_time))
+        sections.append("## Persistent Unresolved Tensions\n" + _markdown_items(unresolved_over_time))
 
     pattern_delta = _natural_text(memory_update.get("round_pattern_delta"))
     if pattern_delta:
-        sections.append("## 本轮差异\n" + pattern_delta)
+        sections.append("## This Round's Shift\n" + pattern_delta)
 
     open_questions = _natural_list(memory_update.get("open_questions"))
     if open_questions:
-        sections.append("## 未完成问题\n" + _markdown_items(open_questions))
+        sections.append("## Unfinished Questions\n" + _markdown_items(open_questions))
 
     synthesis = _natural_text(memory_update.get("synthesis"))
     if not synthesis:
@@ -1185,7 +1180,7 @@ def _format_host_record_display(memory_update: dict[str, Any], fallback: str) ->
     if not sections and synthesis:
         sections.append(synthesis)
 
-    display = "\n\n".join(sections).strip() or "桌长已更新本桌记忆：本轮讨论先保留为内部结构化记录，下一轮将继续围绕这些线索追问。"
+    display = "\n\n".join(sections).strip() or "The host updated this table's memory. This round is stored as an internal structured record, and the next round will continue probing these cues."
     return emphasize_design_opportunities(display)
 
 
@@ -1312,16 +1307,16 @@ def _default_table_spec(table_id: str, question: str) -> TableSpec:
         "table_id": table_id,
         "question": question,
         "expert_skill": "mixed",
-        "expert_rationale": "默认混合专家视角；facilitator 未提供具体 expert-skill routing。",
+        "expert_rationale": "Default mixed expert perspective; the facilitator did not provide specific expert-skill routing.",
         "lens": "reframing",
         "guiding_question": question,
-        "why_this_matters": "该问题用于启动开放、可迁移的 World Cafe 小桌讨论。",
+        "why_this_matters": "This question starts an open, portable World Cafe small-table discussion.",
         "evidence_basis": [],
-        "avoid_solution_bias": "不要直接提出解决方案，优先探索问题条件、张力和重构方向。",
+        "avoid_solution_bias": "Do not propose solutions directly; first explore problem conditions, tensions, and reframing directions.",
         "round_subquestions": {
-            "round_1": ["本桌问题中有哪些值得先观察的真实现象？"],
-            "round_2": ["上一轮观察之间出现了哪些连接、分歧或张力？"],
-            "round_3": ["这些张力是否提示我们需要重构原问题？"],
+            "round_1": ["What real situations should this table observe first?"],
+            "round_2": ["What connections, disagreements, or tensions emerged from the previous round?"],
+            "round_3": ["Do these tensions suggest the original problem should be reframed?"],
         },
     }
 
@@ -1330,9 +1325,9 @@ def _round_subquestions(value: object) -> dict[str, list[str]]:
     if not isinstance(value, dict):
         value = {}
     return {
-        "round_1": _string_list(value.get("round_1")) or ["本桌问题中有哪些值得先观察的真实现象？"],
-        "round_2": _string_list(value.get("round_2")) or ["上一轮观察之间出现了哪些连接、分歧或张力？"],
-        "round_3": _string_list(value.get("round_3")) or ["这些张力是否提示我们需要重构原问题？"],
+        "round_1": _string_list(value.get("round_1")) or ["What real situations should this table observe first?"],
+        "round_2": _string_list(value.get("round_2")) or ["What connections, disagreements, or tensions emerged from the previous round?"],
+        "round_3": _string_list(value.get("round_3")) or ["Do these tensions suggest the original problem should be reframed?"],
     }
 
 
@@ -1419,11 +1414,11 @@ def _formatmemory_summary(record: dict[str, Any]) -> str:
     minority = _string_list(record.get("minority_inspiring_views"))
     tensions = _string_list(record.get("unresolved_tensions"))
     if repeated:
-        parts.append("重复主题：" + "；".join(repeated[:3]))
+        parts.append("Recurring themes: " + "; ".join(repeated[:3]))
     if minority:
-        parts.append("少数启发：" + "；".join(minority[:3]))
+        parts.append("Minority signals: " + "; ".join(minority[:3]))
     if tensions:
-        parts.append("未解张力：" + "；".join(tensions[:3]))
+        parts.append("Unresolved tensions: " + "; ".join(tensions[:3]))
     return " | ".join(parts)
 
 
@@ -1498,7 +1493,7 @@ def _parse_host_memory_update(content: str) -> dict[str, Any]:
 
 def _fallback_host_synthesis(contributions: list[dict[str, Any]], error_message: str) -> str:
     snippets = [str(item.get("content") or "").strip() for item in contributions if str(item.get("content") or "").strip()]
-    first_snippet = snippets[0][:160] if snippets else "本轮没有可用发言。"
+    first_snippet = snippets[0][:160] if snippets else "No usable contribution was available this round."
     return json.dumps(
         {
             "tablememory_usage_description": TABLEMEMORY_USAGE_DESCRIPTION,
@@ -1507,9 +1502,9 @@ def _fallback_host_synthesis(contributions: list[dict[str, Any]], error_message:
                 "round_index": None,
                 "repeated_themes": [first_snippet],
                 "minority_inspiring_views": [],
-                "unresolved_tensions": [f"桌长 formatmemory 生成失败：{error_message[:160]}"],
+                "unresolved_tensions": [f"Host formatmemory generation failed: {error_message[:160]}"],
             },
-            "next_round_question_seeds": ["下一轮需要回到本桌问题，继续确认哪些观点可被证据支持。"],
+            "next_round_question_seeds": ["Next round should return to this table question and verify which claims are supported by evidence."],
         },
         ensure_ascii=False,
     )
@@ -1523,7 +1518,7 @@ def _fallback_agent_packet_content(
 ) -> str:
     personal_takeaway = next((item.strip() for item in agent_contributions if item.strip()), "")
     if not personal_takeaway:
-        personal_takeaway = f"{agent['name']} 本轮没有形成可用发言。"
+        personal_takeaway = f"{agent['name']} did not produce a usable contribution this round."
     return json.dumps(
         {
             "agent": {
@@ -1533,7 +1528,7 @@ def _fallback_agent_packet_content(
                 "skills": agent.get("skills", []),
             },
             "agent_generated_memory": {
-                "skill_lens": "、".join(agent.get("skills", [])) or agent.get("role", ""),
+                "skill_lens": ", ".join(agent.get("skills", [])) or agent.get("role", ""),
                 "personal_insight": personal_takeaway[:220],
             },
             "generation_error": error_message[:160],
@@ -1636,9 +1631,9 @@ def _bridge_intent_from_memory(agent_memory: object) -> str:
             or ""
         ).strip()
         if insight:
-            return f"带着这个个人洞察进入下一桌：{insight[:80]}"
+            return f"Carry this personal insight into the next table: {insight[:80]}"
     if isinstance(agent_memory, str) and agent_memory.strip():
-        return f"带着这个个人洞察进入下一桌：{agent_memory.strip()[:80]}"
+        return f"Carry this personal insight into the next table: {agent_memory.strip()[:80]}"
     return ""
 
 

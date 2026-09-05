@@ -79,4 +79,4 @@ def state_to_jsonable(state: WorldCafeState) -> dict[str, Any]:
 
 
 def _bullet_lines(items: list[str]) -> list[str]:
-    return [f"- {item}" for item in items] or ["- 暂无"]
+    return [f"- {item}" for item in items] or ["- None yet"]

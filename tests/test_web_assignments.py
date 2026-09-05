@@ -42,10 +42,10 @@ def test_default_web_assignments_keep_first_four_agents_as_speakers() -> None:
 @pytest.mark.asyncio
 async def test_create_run_preserves_background_for_discussion_prompts() -> None:
     body = RunCreateBody(
-        tables=[TableQuestionBody(table_id="table_01", question="如何设计共创流程？")],
+        tables=[TableQuestionBody(table_id="table_01", question="How might we design a co-creation process?")],
         rounds=1,
         speakers_per_table=1,
-        background_context="# 项目背景\n需要服务老龄社区。",
+        background_context="# Project Background\nThe service needs to support an aging community.",
         background_filename="brief.md",
     )
 
@@ -53,7 +53,7 @@ async def test_create_run_preserves_background_for_discussion_prompts() -> None:
 
     try:
         state = RUNS[snapshot["run_id"]].state
-        assert state["background_context"] == "# 项目背景\n需要服务老龄社区。"
+        assert state["background_context"] == "# Project Background\nThe service needs to support an aging community."
         assert state["background_filename"] == "brief.md"
     finally:
         RUNS.pop(snapshot["run_id"], None)
@@ -80,17 +80,17 @@ def test_static_app_accepts_common_text_brief_formats_and_harvest_notes() -> Non
     assert ".yaml" in html
     assert ".rtf" in html
     assert "isSupportedBriefFile" in js
-    assert "请上传常见文本格式的 brief" in js
+    assert "Please upload a common text brief format" in js
     assert "getClosestNoteSource" in js
     assert "harvestContent" in js
     assert "sourceType" in js
     assert '"harvest"' in js
-    assert "全局总结" in js
+    assert "Global Harvest" in js
 
 
 def test_create_run_accepts_speeches_per_agent() -> None:
     body = RunCreateBody(
-        tables=[TableQuestionBody(table_id="table_01", question="如何设计共创流程？")],
+        tables=[TableQuestionBody(table_id="table_01", question="How might we design a co-creation process?")],
         rounds=1,
         speakers_per_table=1,
         speeches_per_agent=4,
@@ -108,8 +108,8 @@ def test_static_app_exposes_speech_count_pause_and_notebook_controls() -> None:
     assert 'id="speechesPerAgent"' in html
     assert 'id="pauseBtn"' in html
     assert 'id="notebookList"' in html
-    assert "设计机会洞察" in html
-    assert html.count("写下结构化洞察") == 3
+    assert "Design opportunity insights" in html
+    assert html.count("Capture a structured insight") == 3
     assert "/static/app.js?v=" in html
     assert "/static/styles.css?v=" in html
     assert "speeches_per_agent: getSpeechesPerAgent()" in js
@@ -121,7 +121,7 @@ def test_static_app_exposes_speech_count_pause_and_notebook_controls() -> None:
     assert "isNoteTakingActive" in js
     assert "/note-checkpoint/continue" in js
     assert 'action: "switch_table"' in js
-    assert "换桌" in js
+    assert "Rotate Table" in js
     assert "table_id: entry.tableId" in js
     assert "round_index: Number(entry.roundIndex)" in js
     assert "const tableId = speech.dataset.tableId" in js
@@ -129,8 +129,8 @@ def test_static_app_exposes_speech_count_pause_and_notebook_controls() -> None:
     assert "speakerName" in js
     assert 'id="noteCheckpointPanel"' in html
     assert 'id="continueNotesBtn"' in html
-    assert "完成本桌笔记后换桌" in html
-    assert "点击“换桌”后桌长才会生成本轮记忆" in html
+    assert "Finish notes before rotating tables" in html
+    assert "The host will generate memory after you rotate" in html
     assert "user-note-highlight" in css
     assert "note-checkpoint-panel" in css
     assert "background: #ffe66f !important" in css
@@ -142,9 +142,9 @@ def test_static_app_exposes_speech_count_pause_and_notebook_controls() -> None:
     assert "scrollTableToBottom" in js
     assert "renderHostMemoryTooltip" in js
     assert "renderMemoryRound" in js
-    assert "重复主题" in js
-    assert "少数启发" in js
-    assert "未解张力" in js
+    assert "Recurring Themes" in js
+    assert "Minority Signals" in js
+    assert "Unresolved Tensions" in js
     assert ".memory-round" in css
     assert ".memory-list" in css
 
@@ -155,7 +155,7 @@ def test_static_app_tracks_all_note_highlights_and_downloads_activity_log() -> N
     js = (root / "src/world_cafe/static/app.js").read_text(encoding="utf-8")
 
     assert 'id="downloadActivityLogBtn"' in html
-    assert "下载日志" in html
+    assert "Download Log" in html
     assert "let userActivityLog = []" in js
     assert "function recordUserAction" in js
     assert "function downloadActivityLog" in js
@@ -171,7 +171,7 @@ def test_static_app_tracks_all_note_highlights_and_downloads_activity_log() -> N
 @pytest.mark.asyncio
 async def test_pause_and_resume_update_run_snapshot_without_losing_context() -> None:
     body = RunCreateBody(
-        tables=[TableQuestionBody(table_id="table_01", question="如何继续讨论？")],
+        tables=[TableQuestionBody(table_id="table_01", question="How should the discussion continue?")],
         rounds=1,
         speakers_per_table=1,
     )
@@ -195,7 +195,7 @@ async def test_pause_and_resume_update_run_snapshot_without_losing_context() -> 
 @pytest.mark.asyncio
 async def test_note_checkpoint_continue_endpoint_releases_waiting_session() -> None:
     body = RunCreateBody(
-        tables=[TableQuestionBody(table_id="table_01", question="如何保留用户笔记？")],
+        tables=[TableQuestionBody(table_id="table_01", question="How should user notes be preserved?")],
         rounds=1,
         speakers_per_table=1,
     )
@@ -222,7 +222,7 @@ async def test_note_checkpoint_continue_endpoint_releases_waiting_session() -> N
                 notes=[
                     UserNoteBody(
                         id="note-1",
-                        text="用户显式标记的设计机会。",
+                        text="The user explicitly marked a design opportunity.",
                         table_id="table_01",
                         round_index=0,
                         speaker_name="Agent One",
@@ -234,7 +234,7 @@ async def test_note_checkpoint_continue_endpoint_releases_waiting_session() -> N
                     ),
                     UserNoteBody(
                         id="note-other-table",
-                        text="不应混入其它桌。",
+                        text="This should not be mixed into another table.",
                         table_id="table_02",
                         round_index=0,
                     ),
@@ -246,7 +246,7 @@ async def test_note_checkpoint_continue_endpoint_releases_waiting_session() -> N
         assert result["status"] == "notes_submitted"
         assert result["action"] == "switch_table"
         assert result["note_count"] == 1
-        assert notes[0]["text"] == "用户显式标记的设计机会。"
+        assert notes[0]["text"] == "The user explicitly marked a design opportunity."
         assert notes[0]["highlight_count"] == 2
         assert session.submitted_notes["table_01:0"][0]["speaker_id"] == "agent_01"
         assert checkpoint_id not in session.note_checkpoint_meta

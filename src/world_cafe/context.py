@@ -36,7 +36,7 @@ def format_table_memory(memory: TableMemory, *, view: MemoryView = "host_synthes
 
 def format_table_spec(table_spec: TableSpec | dict[str, Any]) -> str:
     if not table_spec:
-        return "暂无。"
+        return "None yet."
     return _compact_json(table_spec)
 
 
@@ -55,18 +55,18 @@ def parent_question_from_spec(question: str, table_spec: TableSpec | dict[str, A
 
 def format_carry_over_packet(packet: CarryOverPacket | dict[str, Any] | None) -> str:
     if not packet:
-        return "暂无。"
+        return "None yet."
     agent = packet.get("agent") if isinstance(packet.get("agent"), dict) else {}
     agent_id = str(agent.get("id") or packet.get("agent_id") or "unknown agent")
     agent_name = str(agent.get("name") or agent_id)
     skills = agent.get("skills") if isinstance(agent.get("skills"), list) else []
-    skill_text = "、".join(str(skill) for skill in skills if str(skill).strip()) or "未填写"
+    skill_text = ", ".join(str(skill) for skill in skills if str(skill).strip()) or "not specified"
     route = _route_line(packet)
     lines = [
-        f"迁移路径：{route}",
-        f"agent：{agent_name} ({agent_id}) | skills: {skill_text}",
-        _block("个人迁移洞察", packet.get("agent_generated_memory"), limit=4),
-        _line("迁移意图", _bridge_intent_from_memory(packet.get("agent_generated_memory"))),
+        f"Migration route: {route}",
+        f"Agent: {agent_name} ({agent_id}) | skills: {skill_text}",
+        _block("Personal migration insight", packet.get("agent_generated_memory"), limit=4),
+        _line("Bridge intent", _bridge_intent_from_memory(packet.get("agent_generated_memory"))),
     ]
     return _join(lines)
 
@@ -74,10 +74,10 @@ def format_carry_over_packet(packet: CarryOverPacket | dict[str, Any] | None) ->
 def format_background(background_context: str) -> str:
     context = background_context.strip()
     if not context:
-        return "暂无。"
+        return "None yet."
     max_chars = 12000
     if len(context) > max_chars:
-        context = f"{context[:max_chars]}\n\n[背景材料过长，已截断到前 {max_chars} 字符。]"
+        context = f"{context[:max_chars]}\n\n[Background material is too long and has been truncated to the first {max_chars} characters.]"
     return context
 
 
@@ -101,93 +101,93 @@ def format_closing_context(memory_update: dict[str, Any]) -> str:
     record = _formatmemory_from_update(memory_update)
     lines: list[str] = []
     for key, label in (
-        ("repeated_themes", "重复主题"),
-        ("minority_inspiring_views", "少数但有启发的观点"),
-        ("unresolved_tensions", "未解决张力"),
+        ("repeated_themes", "Recurring themes"),
+        ("minority_inspiring_views", "Minority but inspiring views"),
+        ("unresolved_tensions", "Unresolved tensions"),
     ):
         items = _items(record.get(key), limit=5)
         if items:
-            lines.append(f"{label}：")
+            lines.append(f"{label}:")
             lines.extend(f"- {item}" for item in items)
     seeds = _items(memory_update.get("next_round_question_seeds") or memory_update.get("open_questions"), limit=3)
     if seeds:
-        lines.append("可带走的问题种子：")
+        lines.append("Question seeds to carry forward:")
         lines.extend(f"- {item}" for item in seeds)
-    return "\n".join(lines) or "本轮内在记忆没有提取到可见结束语线索。"
+    return "\n".join(lines) or "This round's internal memory did not yield visible closing-note cues."
 
 
 def _format_speaker_memory(memory: TableMemory) -> str:
     lines = [
-        _line("tablememory 使用说明", _tablememory_usage_description(memory)),
-        _line("桌子问题", memory.get("question")),
-        _line("活记忆摘要", memory.get("living_summary")),
-        _block("最近 formatmemory", _formatmemory_digest(memory, limit=2, compact=True), limit=2),
-        _block("下一轮问题种子", memory.get("next_round_question_seeds"), limit=2),
+        _line("tablememory usage", _tablememory_usage_description(memory)),
+        _line("Table question", memory.get("question")),
+        _line("Living memory summary", memory.get("living_summary")),
+        _block("Recent formatmemory", _formatmemory_digest(memory, limit=2, compact=True), limit=2),
+        _block("Next-round question seeds", memory.get("next_round_question_seeds"), limit=2),
     ]
     return _join(lines)
 
 
 def _format_host_opening_memory(memory: TableMemory) -> str:
     lines = [
-        _line("tablememory 使用说明", _tablememory_usage_description(memory)),
-        _line("桌子问题", memory.get("question")),
-        _line("活记忆摘要", memory.get("living_summary")),
-        _block("已记录 formatmemory", _formatmemory_digest(memory, limit=3), limit=3),
-        _block("下一轮问题种子", memory.get("next_round_question_seeds"), limit=4),
+        _line("tablememory usage", _tablememory_usage_description(memory)),
+        _line("Table question", memory.get("question")),
+        _line("Living memory summary", memory.get("living_summary")),
+        _block("Recorded formatmemory", _formatmemory_digest(memory, limit=3), limit=3),
+        _block("Next-round question seeds", memory.get("next_round_question_seeds"), limit=4),
     ]
     return _join(lines)
 
 
 def _format_host_synthesis_memory(memory: TableMemory) -> str:
     lines = [
-        _line("tablememory 使用说明", _tablememory_usage_description(memory)),
-        _line("桌子问题", memory.get("question")),
-        _line("活记忆摘要", memory.get("living_summary")),
-        _block("已完成轮次 formatmemory", _formatmemory_digest(memory, limit=4), limit=4),
-        _block("下一轮问题种子", memory.get("next_round_question_seeds"), limit=4),
+        _line("tablememory usage", _tablememory_usage_description(memory)),
+        _line("Table question", memory.get("question")),
+        _line("Living memory summary", memory.get("living_summary")),
+        _block("Completed-round formatmemory", _formatmemory_digest(memory, limit=4), limit=4),
+        _block("Next-round question seeds", memory.get("next_round_question_seeds"), limit=4),
     ]
     return _join(lines)
 
 
 def _format_host_closing_memory(memory: TableMemory) -> str:
     lines = [
-        _line("tablememory 使用说明", _tablememory_usage_description(memory)),
-        _line("桌子问题", memory.get("question")),
-        _line("活记忆摘要", memory.get("living_summary")),
-        _block("最近 formatmemory", _formatmemory_digest(memory, limit=1), limit=1),
-        _block("下一轮问题种子", memory.get("next_round_question_seeds"), limit=3),
+        _line("tablememory usage", _tablememory_usage_description(memory)),
+        _line("Table question", memory.get("question")),
+        _line("Living memory summary", memory.get("living_summary")),
+        _block("Recent formatmemory", _formatmemory_digest(memory, limit=1), limit=1),
+        _block("Next-round question seeds", memory.get("next_round_question_seeds"), limit=3),
     ]
     return _join(lines)
 
 
 def _format_packet_source_memory(memory: TableMemory) -> str:
     lines = [
-        _line("tablememory 使用说明", _tablememory_usage_description(memory)),
-        _line("来源桌问题", memory.get("question")),
-        _line("来源桌活记忆摘要", memory.get("living_summary")),
-        _block("来源桌最近 formatmemory", _formatmemory_digest(memory, limit=1), limit=1),
+        _line("tablememory usage", _tablememory_usage_description(memory)),
+        _line("Source table question", memory.get("question")),
+        _line("Source table living memory summary", memory.get("living_summary")),
+        _block("Source table recent formatmemory", _formatmemory_digest(memory, limit=1), limit=1),
     ]
     return _join(lines)
 
 
 def _format_harvest_memory(memory: TableMemory) -> str:
     lines = [
-        _line("tablememory 使用说明", _tablememory_usage_description(memory)),
-        _line("桌子问题", memory.get("question")),
-        _line("活记忆摘要", memory.get("living_summary")),
+        _line("tablememory usage", _tablememory_usage_description(memory)),
+        _line("Table question", memory.get("question")),
+        _line("Living memory summary", memory.get("living_summary")),
         _block("formatmemory", _formatmemory_digest(memory, limit=4), limit=4),
-        _block("问题种子", memory.get("next_round_question_seeds"), limit=3),
+        _block("Question seeds", memory.get("next_round_question_seeds"), limit=3),
     ]
     return _join(lines)
 
 
 def _format_full_memory(memory: TableMemory) -> str:
     lines = [
-        _line("tablememory 使用说明", _tablememory_usage_description(memory)),
-        _line("桌子问题", memory.get("question")),
-        _line("活记忆摘要", memory.get("living_summary")),
+        _line("tablememory usage", _tablememory_usage_description(memory)),
+        _line("Table question", memory.get("question")),
+        _line("Living memory summary", memory.get("living_summary")),
         _block("formatmemory", _formatmemory_digest(memory, limit=6), limit=6),
-        _block("下一轮问题种子", memory.get("next_round_question_seeds"), limit=8),
+        _block("Next-round question seeds", memory.get("next_round_question_seeds"), limit=8),
     ]
     return _join(lines)
 
@@ -213,15 +213,15 @@ def _formatmemory_digest(memory: TableMemory, *, limit: int, compact: bool = Fal
         tensions = _inline_list(item.get("unresolved_tensions"))
         if compact:
             parts = [part for part in (repeated, minority, tensions) if part]
-            lines.append(f"Round {round_no}: {' | '.join(parts) or '暂无'}")
+            lines.append(f"Round {round_no}: {' | '.join(parts) or 'None yet'}")
             continue
         parts = [f"Round {round_no}"]
         if repeated:
-            parts.append(f"重复主题: {repeated}")
+            parts.append(f"Recurring themes: {repeated}")
         if minority:
-            parts.append(f"少数启发: {minority}")
+            parts.append(f"Minority signals: {minority}")
         if tensions:
-            parts.append(f"未解张力: {tensions}")
+            parts.append(f"Unresolved tensions: {tensions}")
         lines.append(" | ".join(parts))
     return lines
 
@@ -283,9 +283,9 @@ def _bridge_intent_from_memory(agent_memory: object) -> str:
             or ""
         ).strip()
         if insight:
-            return f"带到下一桌这条个人洞察：{insight[:80]}"
+            return f"Carry this personal insight to the next table: {insight[:80]}"
     if isinstance(agent_memory, str) and agent_memory.strip():
-        return f"带到下一桌这条个人洞察：{agent_memory.strip()[:80]}"
+        return f"Carry this personal insight to the next table: {agent_memory.strip()[:80]}"
     return ""
 
 
@@ -301,19 +301,19 @@ def _round_digest(memory: TableMemory, *, limit: int, compact: bool = False) -> 
         delta = str(update.get("round_pattern_delta") or "").strip()
         if compact:
             parts = [part for part in (synthesis, delta) if part]
-            lines.append(f"Round {round_no}: {' | '.join(parts) or '暂无摘要'}")
+            lines.append(f"Round {round_no}: {' | '.join(parts) or 'No summary yet'}")
             continue
-        parts = [f"Round {round_no}: {synthesis or '暂无摘要'}"]
+        parts = [f"Round {round_no}: {synthesis or 'No summary yet'}"]
         for label, value in (
-            ("累计演化", update.get("cumulative_pattern_evolution")),
-            ("本轮位置/变化", delta),
-            ("洞察", item.get("key_insights")),
-            ("张力", item.get("tensions")),
-            ("开放问题", item.get("open_questions")),
-            ("成形", update.get("stable_patterns")),
-            ("不完善", update.get("incomplete_or_weak_patterns")),
-            ("冲突", update.get("contested_points")),
-            ("盲点", update.get("blind_spots_or_ambiguities")),
+            ("Cumulative evolution", update.get("cumulative_pattern_evolution")),
+            ("This round's position/shift", delta),
+            ("Insights", item.get("key_insights")),
+            ("Tensions", item.get("tensions")),
+            ("Open questions", item.get("open_questions")),
+            ("Settled patterns", update.get("stable_patterns")),
+            ("Underdeveloped patterns", update.get("incomplete_or_weak_patterns")),
+            ("Contested points", update.get("contested_points")),
+            ("Blind spots", update.get("blind_spots_or_ambiguities")),
         ):
             text = _inline_list(value) if isinstance(value, list) else str(value or "").strip()
             if text:
@@ -324,14 +324,14 @@ def _round_digest(memory: TableMemory, *, limit: int, compact: bool = False) -> 
 
 def _line(label: str, value: object) -> str:
     text = _text(value)
-    return f"{label}：{text}" if text else ""
+    return f"{label}: {text}" if text else ""
 
 
 def _block(label: str, value: object, *, limit: int) -> str:
     items = _items(value, limit=limit)
     if not items:
         return ""
-    return f"{label}：\n" + "\n".join(f"- {item}" for item in items)
+    return f"{label}:\n" + "\n".join(f"- {item}" for item in items)
 
 
 def _items(value: object, *, limit: int) -> list[str]:
@@ -347,7 +347,7 @@ def _items(value: object, *, limit: int) -> list[str]:
 
 
 def _inline_list(value: object, *, limit: int = 3) -> str:
-    return "；".join(_items(value, limit=limit))
+    return "; ".join(_items(value, limit=limit))
 
 
 def _text(value: object) -> str:
@@ -360,7 +360,7 @@ def _text(value: object) -> str:
 
 def _join(lines: list[str]) -> str:
     visible = [line for line in lines if line.strip()]
-    return "\n".join(visible) if visible else "暂无。"
+    return "\n".join(visible) if visible else "None yet."
 
 
 def _route_line(packet: CarryOverPacket | dict[str, Any]) -> str:
@@ -387,7 +387,7 @@ def _anchor_text(anchor: object) -> str:
 
 def _compact_json(value: Any) -> str:
     if value in ("", None, [], {}):
-        return "暂无"
+        return "None yet"
     if isinstance(value, str):
         return value
     return json.dumps(value, ensure_ascii=False, indent=2)

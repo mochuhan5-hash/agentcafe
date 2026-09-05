@@ -1,13 +1,10 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Agent Cafe</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/styles.css?v=20260608-brief-harvest-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260903-english-ui-1" />
   </head>
   <body>
     <div class="app-shell mode-config">
@@ -35,16 +32,16 @@
               <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
               <path d="M3 21v-5h5" />
             </svg>
-            <span>新研讨 (New Order)</span>
+            <span>New Session</span>
           </button>
-          <div class="status-pill" id="runStatus">空闲</div>
+          <div class="status-pill" id="runStatus">Idle</div>
         </div>
       </header>
 
       <main class="workspace">
-        <section class="request-pane" aria-label="用户聊天窗口">
+        <section class="request-pane" aria-label="User chat">
           <div class="pane-header">
-            <h2>研讨主题</h2>
+            <h2>Discussion Topic</h2>
             <span id="roundBadge">0 / 0</span>
           </div>
 
@@ -52,17 +49,17 @@
             <div class="request-pane-scrollable">
               <div class="chat-log" id="chatLog" aria-live="polite"></div>
 
-              <div class="settings-panel" aria-label="流程设置">
+              <div class="settings-panel" aria-label="Flow settings">
                 <label>
-                  <span>桌数</span>
+                  <span>Tables</span>
                   <input id="tableCount" type="number" min="1" max="8" value="4" />
                 </label>
                 <label>
-                  <span>每桌发言人数</span>
+                  <span>Speakers Per Table</span>
                   <input id="speakersPerTable" type="number" min="1" max="8" value="3" />
                 </label>
                 <label>
-                  <span>每人发言次数</span>
+                  <span>Turns Per Speaker</span>
                   <input id="speechesPerAgent" type="number" min="1" max="8" value="3" />
                 </label>
               </div>
@@ -75,23 +72,23 @@
                       <polyline points="17 8 12 3 7 8" />
                       <line x1="12" y1="3" x2="12" y2="15" />
                     </svg>
-                    <span>Brief / 背景材料（常见文本格式，可选）</span>
+                    <span>Brief / Background Material (common text formats, optional)</span>
                   </label>
                   <input id="backgroundFile" type="file" accept=".md,.markdown,.txt,.text,.csv,.tsv,.json,.jsonl,.yaml,.yml,.xml,.html,.htm,.rtf,.log,text/*,application/json,application/xml,application/rtf,text/rtf" />
                   <div class="background-meta">
-                    <span id="backgroundSummary">未上传背景材料</span>
-                    <button type="button" class="secondary" id="chooseBackgroundBtn">选择文件</button>
-                    <button type="button" class="secondary" id="clearBackgroundBtn" hidden>清除</button>
+                    <span id="backgroundSummary">No background file uploaded</span>
+                    <button type="button" class="secondary" id="chooseBackgroundBtn">Choose File</button>
+                    <button type="button" class="secondary" id="clearBackgroundBtn" hidden>Clear</button>
                   </div>
                 </div>
                 
                 <div class="textarea-wrapper">
-                  <label for="userRequest">用户请求</label>
+                  <label for="userRequest">User Request</label>
                   <textarea
                     id="userRequest"
                     name="userRequest"
                     rows="5"
-                    placeholder="输入一个希望通过世界咖啡展开的主题或任务..."
+                    placeholder="Enter a topic or task you want to explore through World Cafe..."
                     required
                   ></textarea>
                 </div>
@@ -101,48 +98,48 @@
             <div class="button-row">
               <button type="submit" id="facilitateBtn">
                 <span class="icon-sparkle">✦</span>
-                主题规划
+                Plan Topic
               </button>
               <button type="button" id="startBtn" disabled>
                 <span class="icon-play">▶</span>
-                开始研讨
+                Start Discussion
               </button>
             </div>
           </form>
         </section>
 
-        <section class="discussion-pane" aria-label="讨论过程">
+        <section class="discussion-pane" aria-label="Discussion process">
           <div class="discussion-toolbar">
             <div class="phase-track" id="phaseTrack">
-              <span data-phase="facilitate">引导</span>
-              <span data-phase="setup">配置</span>
-              <span data-phase="round_started">研讨</span>
-              <span data-phase="rotation">换桌</span>
-              <span data-phase="harvest">总结</span>
-              <span data-phase="done">完成</span>
+              <span data-phase="facilitate">Facilitate</span>
+              <span data-phase="setup">Setup</span>
+              <span data-phase="round_started">Discuss</span>
+              <span data-phase="rotation">Rotate</span>
+              <span data-phase="harvest">Harvest</span>
+              <span data-phase="done">Done</span>
             </div>
-            <div class="agent-status-dock" id="agentStatusDock" aria-label="Agent 状态"></div>
-            <button type="button" class="secondary" id="pauseBtn" disabled>暂停标注</button>
+            <div class="agent-status-dock" id="agentStatusDock" aria-label="Agent status"></div>
+            <button type="button" class="secondary" id="pauseBtn" disabled>Pause to Annotate</button>
           </div>
           <div class="question-editor" id="questionEditor" hidden></div>
           <div class="discussion-layout">
             <div class="discussion-main">
               <div class="tables-grid" id="tablesGrid"></div>
             </div>
-            <aside class="notebook-panel" aria-label="标注笔记本">
+            <aside class="notebook-panel" aria-label="Annotation notebook">
               <div class="notebook-header">
-                <h2>设计笔记本</h2>
-                <span id="notebookCount" class="badge">0 条笔记</span>
+                <h2>Design Notebook</h2>
+                <span id="notebookCount" class="badge">0 notes</span>
               </div>
-              <p class="notebook-hint">暂停后在 agent 原文中划选文字，点击“加入笔记”进行标注。</p>
+              <p class="notebook-hint">Pause, select text from an agent message, then add it as a note.</p>
               <div id="noteCheckpointPanel" class="note-checkpoint-panel" hidden>
-                <strong id="noteCheckpointTitle">完成本桌笔记后换桌</strong>
-                <p id="noteCheckpointDetail">请先完成本桌本轮的设计洞察/机会笔记，点击“换桌”后桌长才会生成本轮记忆。</p>
-                <button type="button" id="continueNotesBtn">换桌</button>
+                <strong id="noteCheckpointTitle">Finish notes before rotating tables</strong>
+                <p id="noteCheckpointDetail">Finish this table's insight and opportunity notes for the round. The host will generate memory after you rotate.</p>
+                <button type="button" id="continueNotesBtn">Rotate Table</button>
               </div>
               <div class="notebook-actions">
-                <button type="button" class="secondary" id="addNoteBtn" disabled>加入笔记</button>
-                <button type="button" class="secondary" id="downloadActivityLogBtn">下载日志</button>
+                <button type="button" class="secondary" id="addNoteBtn" disabled>Add Note</button>
+                <button type="button" class="secondary" id="downloadActivityLogBtn">Download Log</button>
               </div>
               <div id="notebookList" class="notebook-list"></div>
             </aside>
@@ -150,26 +147,26 @@
         </section>
       </main>
 
-      <section class="harvest-band" aria-label="全局 harvest">
+      <section class="harvest-band" aria-label="Global harvest">
         <div class="harvest-header">
-          <h2>全局成果收获</h2>
-          <span id="traceCount" class="badge">0 个事件</span>
+          <h2>Global Harvest</h2>
+          <span id="traceCount" class="badge">0 events</span>
         </div>
-        <div id="harvestContent" class="markdown-lite muted">等待讨论完成</div>
-        <div class="design-opportunities" aria-label="设计机会洞察">
-          <h3>结构化设计洞察</h3>
+        <div id="harvestContent" class="markdown-lite muted">Waiting for the discussion to finish</div>
+        <div class="design-opportunities" aria-label="Design opportunity insights">
+          <h3>Structured Design Insights</h3>
           <div class="opportunity-grid">
             <label>
-              <span>洞察 1</span>
-              <textarea rows="3" placeholder="写下结构化洞察：用户需求 / 问题重构 / 设计方向..."></textarea>
+              <span>Insight 1</span>
+              <textarea rows="3" placeholder="Capture a structured insight: user need / problem reframe / design direction..."></textarea>
             </label>
             <label>
-              <span>洞察 2</span>
-              <textarea rows="3" placeholder="写下结构化洞察：用户需求 / 问题重构 / 设计方向..."></textarea>
+              <span>Insight 2</span>
+              <textarea rows="3" placeholder="Capture a structured insight: user need / problem reframe / design direction..."></textarea>
             </label>
             <label>
-              <span>洞察 3</span>
-              <textarea rows="3" placeholder="写下结构化洞察：用户需求 / 问题重构 / 设计方向..."></textarea>
+              <span>Insight 3</span>
+              <textarea rows="3" placeholder="Capture a structured insight: user need / problem reframe / design direction..."></textarea>
             </label>
           </div>
         </div>
@@ -184,24 +181,24 @@
         <div class="agent-profile-header">
           <div class="agent-large-avatar" id="modalAgentAvatar">?</div>
           <div>
-            <h3 id="modalAgentName">智能体名称</h3>
-            <span class="role-chip" id="modalAgentRole">角色</span>
+            <h3 id="modalAgentName">Agent Name</h3>
+            <span class="role-chip" id="modalAgentRole">Role</span>
           </div>
         </div>
         <div class="agent-profile-body">
           <div class="profile-section" id="modalAgentMemorySection" hidden></div>
           <div class="profile-section">
-            <h4>专家技能</h4>
+            <h4>Expert Skills</h4>
             <div class="skills-grid" id="modalAgentSkills"></div>
           </div>
           <div class="profile-section">
-            <h4>讨论风格与关注视角</h4>
-            <p id="modalAgentStyle">加载中...</p>
+            <h4>Discussion Style And Lens</h4>
+            <p id="modalAgentStyle">Loading...</p>
           </div>
         </div>
       </div>
     </div>
 
-    <script src="/static/app.js?v=20260608-brief-harvest-1" type="module"></script>
+    <script src="/static/app.js?v=20260903-english-ui-1" type="module"></script>
   </body>
 </html>

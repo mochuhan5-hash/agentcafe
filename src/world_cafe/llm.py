@@ -91,31 +91,31 @@ class DryRunCafeLLM:
         if "## opening" in user:
             return (
                 "## opening\n"
-                "- 哪些使用者处境最容易被平均化描述遮住？\n"
-                f"- 哪个分歧最可能改变我们理解问题的方式？（trace {digest}）\n\n"
+                "- Which user situations are most likely to be hidden by average descriptions?\n"
+                f"- Which disagreement could most change how we understand the problem? (trace {digest})\n\n"
                 "## question_seeds\n"
-                "- 哪些使用者处境最容易被平均化描述遮住？\n"
-                "- 哪个分歧最可能改变我们理解问题的方式？\n"
+                "- Which user situations are most likely to be hidden by average descriptions?\n"
+                "- Which disagreement could most change how we understand the problem?\n"
             )
-        if "本轮可见结束语" in system or "本轮结束语" in user:
+        if "visible closing note" in system or "closing note" in user:
             return (
-                "- 成形：讨论开始把抽象判断落到可观察情境。\n"
-                "- 模糊：证据强度、边缘用户和利益相关者边界还没说透。\n"
-                "- 冲突：快速收束和保留分歧之间仍有拉扯。\n"
-                f"- 带走：下一轮追问哪个弱信号能打开**新的设计机会**？（trace {digest}）"
+                "- Settling: the discussion is moving abstract judgments into observable situations.\n"
+                "- Unclear: evidence strength, edge users, and stakeholder boundaries need sharper treatment.\n"
+                "- Tension: quick convergence is still pulling against keeping disagreement alive.\n"
+                f"- Carry forward: next round should ask which weak signal can open a **new design opportunity**. (trace {digest})"
             )
         if '"formatmemory"' in user:
             return json.dumps(
                 {
                     "tablememory_usage_description": TABLEMEMORY_USAGE_DESCRIPTION,
                     "formatmemory": {
-                        "table_question": "本桌问题原文",
+                        "table_question": "Original table question",
                         "round_index": 1,
-                        "repeated_themes": ["证据、场景和约束需要一起讨论。"],
-                        "minority_inspiring_views": ["少数观点提醒不要把所有用户旅程平均化。"],
-                        "unresolved_tensions": ["创造性发散与落地约束之间存在张力。"],
+                        "repeated_themes": ["Evidence, situations, and constraints need to be discussed together."],
+                        "minority_inspiring_views": ["A minority view warns against averaging every user journey."],
+                        "unresolved_tensions": ["There is tension between creative divergence and practical constraints."],
                     },
-                    "next_round_question_seeds": ["哪个弱信号可能打开新的问题重构？"],
+                    "next_round_question_seeds": ["Which weak signal could open a new problem reframe?"],
                 },
                 ensure_ascii=False,
             )
@@ -130,23 +130,24 @@ class DryRunCafeLLM:
                     },
                     "agent_generated_memory": {
                         "skill_lens": "reframing",
-                        "personal_insight": "不要把上一桌的共识当成新桌前提。",
+                        "personal_insight": "Do not treat the previous table's consensus as the next table's premise.",
                     },
                 },
                 ensure_ascii=False,
             )
-        if "全局 harvest" in system or "global harvest" in system.lower():
+        if "global harvest" in system.lower():
             return (
-                "设计洞察：\n"
-                "1、用户主要需求的提取：用户需要把抽象议题转成可验证行动，同时避免后续轮次重复讨论。\n"
-                "2、设计问题的重新界定：如何在开放探索中保留边缘用户信号，并把它转化为可验证的设计机会。\n"
-                "3、不超过三个后续的设计方向：\n"
-                "- 选择一个边缘用户断点作为问题重构入口。\n"
-                "- 为每桌设置一个最小可行实验和观察指标。\n"
+                "Design Insights:\n"
+                "### Insight 1\n"
+                "1. User need: Users need abstract issues translated into testable actions without repeating the same discussion in later rounds.\n"
+                "2. Reframed design problem: How might open exploration preserve edge-user signals and turn them into testable **design opportunities**?\n"
+                "3. Up to three next design directions:\n"
+                "- Select one edge-user breakdown as the entry point for reframing.\n"
+                "- Define a minimum viable experiment and observation metric for each table.\n"
             )
         return (
-            f"我先接着现场的讨论往前推一步。当前问题里最值得抓住的，是把抽象判断转成一个可验证的小假设。"
-            f"世界咖啡的价值不在于马上统一意见，而在于让不同经验彼此碰撞，留下下一步可以试的线索。（trace {digest}）"
+            f"I will push the discussion one step forward. The most useful move here is to turn an abstract judgment into a small testable hypothesis. "
+            f"World Cafe is valuable because different experiences collide before the group converges, leaving clues for the next experiment. (trace {digest})"
         )
 
 

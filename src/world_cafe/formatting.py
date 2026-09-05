@@ -4,15 +4,11 @@ import re
 
 
 DESIGN_OPPORTUNITY_TERMS = (
-    "设计机会",
-    "新的设计机会",
-    "新机会",
-    "机会假设",
-    "机会线索",
-    "潜在机会",
-    "机会",
     "design opportunity",
+    "new design opportunity",
     "opportunity hypothesis",
+    "opportunity signal",
+    "potential opportunity",
     "opportunity",
     "opportunities",
 )

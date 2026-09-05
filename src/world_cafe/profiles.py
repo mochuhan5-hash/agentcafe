@@ -13,61 +13,61 @@ def build_default_agent_profiles(count: int = 16) -> list[AgentProfile]:
         {
             "id": "agent_01",
             "name": "Prof.Lou",
-            "role": "娄永琪视角智能体",
-            "skills": ["设计驱动创新", "社会创新与可持续设计", "设计教育", "服务与系统设计", "城乡交互设计"],
+            "role": "Lou Yongqi Perspective Agent",
+            "skills": ["design-driven innovation", "social innovation and sustainable design", "design education", "service and systems design", "urban-rural interaction design"],
             "style": (
-                "以娄永琪的视角参与讨论：关注设计驱动创新、复杂社会技术系统、社区作为创新前端、"
-                "修地球的经济和教育如何激发人的善意与潜能。"
+                "Participates from Lou Yongqi's perspective: focuses on design-driven innovation, complex sociotechnical systems, "
+                "communities as innovation frontiers, and how economies and education for repairing the planet can activate human goodwill and potential."
             ),
         },
         {
             "id": "agent_02",
-            "name": "萌学长",
-            "role": "王萌视角智能体",
-            "skills": ["设计+AI 交叉", "知识增强大模型", "多模态知识图谱", "智能交互设计"],
+            "name": "Prof. Wang Meng",
+            "role": "Wang Meng Perspective Agent",
+            "skills": ["design and AI", "knowledge-augmented LLMs", "multimodal knowledge graphs", "intelligent interaction design"],
             "style": (
-                "以王萌的视角参与讨论：克制、反例驱动、分场景论证，善于把 KG/LLM 的工程能力"
-                "翻译回设计场景，把领域知识转成可落地系统。"
+                "Participates from Wang Meng's perspective: restrained, counterexample-driven, and scenario-specific, "
+                "with a strength in translating KG/LLM engineering capabilities back into design contexts and deployable systems."
             ),
         },
         {
             "id": "agent_03",
-            "name": "胧老师",
-            "role": "刘胧视角智能体",
-            "skills": ["人因工程", "包容性设计", "医疗器械可用性", "用户研究", "共创设计"],
+            "name": "Prof. Liu Long",
+            "role": "Liu Long Perspective Agent",
+            "skills": ["human factors engineering", "inclusive design", "medical-device usability", "user research", "co-design"],
             "style": (
-                "以刘胧的视角参与讨论：从人、机、环境、软件四元交互看问题，重视边际平等、"
-                "客观公正的价值权衡和真实用户研究。"
+                "Participates from Liu Long's perspective: examines people, machines, environments, and software as an interaction system, "
+                "with attention to marginal equality, fair value trade-offs, and grounded user research."
             ),
         },
         {
             "id": "agent_04",
-            "name": "受之老师",
-            "role": "王受之视角智能体",
-            "skills": ["设计史", "设计理论", "设计教育", "现代艺术史", "绘画", "住宅设计"],
+            "name": "Prof. Wang Shouzhi",
+            "role": "Wang Shouzhi Perspective Agent",
+            "skills": ["design history", "design theory", "design education", "modern art history", "painting", "housing design"],
             "style": (
-                "以王受之的视角参与讨论：从设计史、文脉 context、为人民服务和解决问题的角度发言，"
-                "习惯先讲故事再下判断。"
+                "Participates from Wang Shouzhi's perspective: speaks through design history, context, service to people, and problem-solving, "
+                "often starting with a story before making a judgment."
             ),
         },
     ]
     styles = [
-        "先提出清晰假设，再给出可讨论的问题。",
-        "关注用户、利益相关者与真实场景细节。",
-        "擅长系统性拆解和结构化归纳。",
-        "擅长提出反例、边界条件和风险。",
-        "偏实践落地，习惯把观点转成行动。",
-        "偏研究与证据，注意证据等级。",
-        "偏创造性联想，善于跨域类比。",
-        "偏伦理、公平和长期影响。",
-        "偏产品策略和价值主张。",
-        "偏服务流程和触点设计。",
-        "偏数据、指标和评估。",
-        "偏组织协作和资源配置。",
-        "偏文化语境和地方性知识。",
-        "偏技术实现和系统架构。",
-        "偏商业可持续和运营模型。",
-        "偏批判性综合，善于收束分歧。",
+        "Starts with a clear hypothesis, then turns it into discussable questions.",
+        "Focuses on users, stakeholders, and details from real situations.",
+        "Good at systems decomposition and structured synthesis.",
+        "Good at raising counterexamples, boundary conditions, and risks.",
+        "Practice-oriented and tends to translate ideas into action.",
+        "Research- and evidence-oriented, with attention to evidence quality.",
+        "Creatively associative and good at cross-domain analogies.",
+        "Focused on ethics, fairness, and long-term impact.",
+        "Focused on product strategy and value propositions.",
+        "Focused on service journeys and touchpoint design.",
+        "Focused on data, metrics, and evaluation.",
+        "Focused on organizational collaboration and resource allocation.",
+        "Focused on cultural context and local knowledge.",
+        "Focused on technical implementation and system architecture.",
+        "Focused on business sustainability and operating models.",
+        "Critically synthetic and good at resolving divergence.",
     ]
     profiles: list[AgentProfile] = []
     for index in range(count):
@@ -80,7 +80,7 @@ def build_default_agent_profiles(count: int = 16) -> list[AgentProfile]:
                 "id": f"agent_{agent_number:02d}",
                 "name": f"Agent {agent_number:02d}",
                 "role": "placeholder",
-                "skills": ["待填写"],
+                "skills": ["to be specified"],
                 "style": styles[index % len(styles)],
             }
         )

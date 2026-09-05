@@ -39,25 +39,28 @@ async def facilitate_request(
     if table_count < 1:
         raise ValueError("table_count must be at least 1")
     system = (
-        "你是世界咖啡流程中的 facilitator agent。你只负责为每张小桌生成一个初始讨论问句，不同的桌子讨论不同的设计问题。"
-        "每张桌只能有一个问句；问句必须简短、开放、中立、可迁移，不要带解释、细节、引导语或解决方案。"
-        "最终 tables 数量必须严格等于 table_count；只输出 JSON，不要输出 Markdown。"
+        "You are the facilitator agent in a World Cafe workflow. "
+        "Always write all generated questions and JSON string values in English, even when the user request or background material is in another language. "
+        "Your only responsibility is to generate one initial discussion question for each small table, with different tables exploring different design dimensions. "
+        "Each table must have exactly one question. Each question must be brief, open, neutral, and portable across table rotations. "
+        "Do not include explanations, details, framing preambles, or solutions. "
+        "The final number of tables must exactly equal table_count. Output JSON only, with no Markdown."
     )
     examples = ",\n".join(
         (
             f'    {{"table_id": "table_{index:02d}", '
-            '"question": "一个简短问句？"}'
+            '"question": "A brief open question?"}'
         )
         for index in range(1, table_count + 1)
     )
     user = (
-        "用户请求：\n"
+        "User request:\n"
         f"{user_request}\n\n"
         f"{_format_background(background_context, background_filename)}"
-        f"本次必须生成 table_count={table_count} 张小桌问句，tables 数组长度必须等于 {table_count}。\n"
-        "每个 question 必须只有一个问句，建议 8-24 个汉字，不要包含冒号、解释、分点、背景信息或引导语。\n"
-        "每个 question 之间要有较大的差距，要引发不同（异质）维度的设计思考\n"
-        "请严格输出如下 JSON 结构：\n"
+        f"Generate table_count={table_count} small-table questions. The tables array length must be exactly {table_count}.\n"
+        "Each question must contain one English question only, ideally 5-14 words. Do not include colons, explanations, bullet points, background details, or preambles.\n"
+        "Questions should be meaningfully different from one another and should trigger heterogeneous dimensions of design thinking.\n"
+        "Strictly output this JSON structure:\n"
         "{\n"
         '  "tables": [\n'
         f"{examples}\n"
@@ -72,11 +75,11 @@ def _format_background(background_context: str, background_filename: str = "") -
     context = background_context.strip()
     if not context:
         return ""
-    title = f"背景材料（{background_filename}）" if background_filename else "背景材料"
+    title = f"Background material ({background_filename})" if background_filename else "Background material"
     max_chars = 4000
     if len(context) > max_chars:
-        context = f"{context[:max_chars]}\n\n[背景材料过长，已截断到前 {max_chars} 字符。]"
-    return f"{title}：\n{context}\n\n"
+        context = f"{context[:max_chars]}\n\n[Background material is too long and has been truncated to the first {max_chars} characters.]"
+    return f"{title}:\n{context}\n\n"
 
 
 def _parse_facilitation(
@@ -118,11 +121,11 @@ def _parse_facilitation(
             "question": question,
             "guiding_question": question,
             "expert_skill": str(item.get("expert_skill") or "mixed"),
-            "expert_rationale": str(item.get("expert_rationale") or "未提供专家路由理由。"),
+            "expert_rationale": str(item.get("expert_rationale") or "No expert-routing rationale was provided."),
             "lens": str(item.get("lens") or "reframing"),
             "why_this_matters": str(item.get("why_this_matters") or ""),
             "evidence_basis": _string_list(item.get("evidence_basis")),
-            "avoid_solution_bias": str(item.get("avoid_solution_bias") or "避免直接提出解决方案，优先讨论问题条件。"),
+            "avoid_solution_bias": str(item.get("avoid_solution_bias") or "Avoid proposing solutions directly; explore problem conditions first."),
             "round_subquestions": _round_subquestions(item.get("round_subquestions")),
         }
         normalized.append(normalized_item)
@@ -141,7 +144,7 @@ def _parse_facilitation(
         }
     plan["tables"] = [dict(table) for table in normalized]
     return {
-        "facilitation_note": str(data.get("facilitation_note") or "已生成小桌问句。"),
+        "facilitation_note": str(data.get("facilitation_note") or "Small-table questions generated."),
         "tables": normalized,
         "table_question_plan": plan,
         "table_specs": table_specs,
@@ -161,9 +164,9 @@ def _round_subquestions(value: object) -> dict[str, list[str]]:
     if not isinstance(value, dict):
         value = {}
     return {
-        "round_1": _string_list(value.get("round_1")) or ["本桌问题中有哪些值得先观察的真实现象？"],
-        "round_2": _string_list(value.get("round_2")) or ["上一轮观察之间出现了哪些连接、分歧或张力？"],
-        "round_3": _string_list(value.get("round_3")) or ["这些张力是否提示我们需要重构原问题？"],
+        "round_1": _string_list(value.get("round_1")) or ["What real situations should this table observe first?"],
+        "round_2": _string_list(value.get("round_2")) or ["What connections, disagreements, or tensions emerged from the previous round?"],
+        "round_3": _string_list(value.get("round_3")) or ["Do these tensions suggest the original problem should be reframed?"],
     }
 
 
@@ -179,7 +182,7 @@ def _single_question(value: str) -> str:
         question = re.split(r"[。！!；;]", text, maxsplit=1)[0].strip()
     question = question.rstrip("。！!；;，,、")
     if not question.endswith(("？", "?")):
-        question += "？"
+        question += "?"
     return question
 
 
