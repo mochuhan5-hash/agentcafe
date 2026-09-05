@@ -81,6 +81,7 @@ class TableMemory(TypedDict, total=False):
     tablememory_usage_description: str
     formatmemory: list[dict[str, Any]]
     next_round_question_seeds: list[str]
+    rounds: list[dict[str, Any]]
 
 
 class TableRoundOutput(TypedDict):

@@ -15,10 +15,10 @@ SKILL_DIRS: dict[str, str] = {
 }
 
 SKILL_DISPLAY_NAMES: dict[str, str] = {
-    "louyongqi": "娄永琪",
-    "wangmeng": "王萌",
-    "wangshouzhi": "王受之",
-    "liulong": "刘胧",
+    "louyongqi": "Lou Yongqi",
+    "wangmeng": "Wang Meng",
+    "wangshouzhi": "Wang Shouzhi",
+    "liulong": "Liu Long",
 }
 
 
@@ -85,5 +85,5 @@ def all_skill_briefs() -> str:
                 else:
                     break
         desc = " ".join(desc_lines)[:200] if desc_lines else ""
-        lines.append(f"- {key}（{display}）：{desc}")
+        lines.append(f"- {key} ({display}): {desc}")
     return "\n".join(lines)

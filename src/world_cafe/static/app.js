@@ -130,9 +130,8 @@ backgroundFileInput.addEventListener("change", async () => {
     clearBackground();
     return;
   }
-  const lowerName = file.name.toLowerCase();
-  if (!lowerName.endsWith(".md") && !lowerName.endsWith(".markdown") && !lowerName.endsWith(".txt")) {
-    addMessage("error", "请上传 .md 或 .markdown 背景材料。");
+  if (!isSupportedBriefFile(file)) {
+    addMessage("error", "Please upload a common text brief format, such as md, txt, csv, json, yaml, xml, html, rtf, or log.");
     clearBackground();
     return;
   }
@@ -142,13 +141,43 @@ backgroundFileInput.addEventListener("change", async () => {
   clearBackgroundBtn.hidden = false;
 });
 
+const supportedBriefExtensions = new Set([
+  ".md",
+  ".markdown",
+  ".txt",
+  ".text",
+  ".csv",
+  ".tsv",
+  ".json",
+  ".jsonl",
+  ".yaml",
+  ".yml",
+  ".xml",
+  ".html",
+  ".htm",
+  ".rtf",
+  ".log",
+]);
+
+function isSupportedBriefFile(file) {
+  const lowerName = String(file?.name || "").toLowerCase();
+  const dotIndex = lowerName.lastIndexOf(".");
+  const extension = dotIndex >= 0 ? lowerName.slice(dotIndex) : "";
+  const mime = String(file?.type || "").toLowerCase();
+  return (
+    supportedBriefExtensions.has(extension) ||
+    mime.startsWith("text/") ||
+    ["application/json", "application/xml", "application/rtf"].includes(mime)
+  );
+}
+
 chooseBackgroundBtn?.addEventListener("click", () => backgroundFileInput.click());
 clearBackgroundBtn.addEventListener("click", clearBackground);
 pauseBtn.addEventListener("click", togglePause);
 addNoteBtn.addEventListener("mousedown", (event) => event.preventDefault());
 addNoteBtn.addEventListener("click", addSelectedNote);
 continueNotesBtn?.addEventListener("click", submitActiveNoteCheckpoint);
-downloadActivityLogBtn?.addEventListener("click", downloadActivityLog);
+downloadActivityLogBtn.addEventListener("click", downloadActivityLog);
 document.querySelectorAll("[data-final-insight]").forEach((textarea) => {
   textarea.addEventListener("change", () => {
     recordUserAction("final_insights_updated", {
@@ -253,7 +282,7 @@ function closeAgentProfile() {
 
 document.addEventListener("selectionchange", () => {
   pendingNoteSelection = getSelectedDiscussionSelection();
-  addNoteBtn.disabled = !isNoteTakingActive() || !pendingNoteSelection;
+  addNoteBtn.disabled = !canAddNoteFromSelection(pendingNoteSelection);
 });
 
 async function init() {
@@ -640,11 +669,11 @@ function renderQuestionEditor(tables, { expertSkill, expertRationale } = {}) {
   questionEditor.innerHTML = "";
   console.log("[renderQuestionEditor] expertSkill:", expertSkill, "expertRationale:", expertRationale);
   if (expertSkill && expertSkill !== "mixed") {
-    const skillNames = { louyongqi: "娄永琪", wangmeng: "王萌", wangshouzhi: "王受之", liulong: "刘胧" };
+    const skillNames = { louyongqi: "Lou Yongqi", wangmeng: "Wang Meng", wangshouzhi: "Wang Shouzhi", liulong: "Liu Long" };
     const displayName = skillNames[expertSkill] || expertSkill;
     const banner = document.createElement("div");
     banner.className = "skill-banner";
-    banner.innerHTML = `<span class="skill-label">Expert Skill:</span> <strong>${escapeHtml(displayName)}</strong>${expertRationale && !expertRationale.includes("未提供") ? ` <span class="skill-rationale">— ${escapeHtml(expertRationale)}</span>` : ""}`;
+    banner.innerHTML = `<span class="skill-label">Expert Skill:</span> <strong>${escapeHtml(displayName)}</strong>${expertRationale && !expertRationale.includes("No expert-routing rationale") ? ` <span class="skill-rationale">- ${escapeHtml(expertRationale)}</span>` : ""}`;
     questionEditor.append(banner);
   }
   buildDefaultAssignments(tables);
@@ -1041,6 +1070,7 @@ function appendContribution(metadata) {
   speech.dataset.speakerId = metadata.agent_id || "";
   speech.dataset.tableId = metadata.table_id || "";
   speech.dataset.roundIndex = metadata.round_index ?? "";
+  speech.dataset.sourceType = "speech";
   if (metadata.generation_error) {
     speech.classList.add("speech-error");
   }
@@ -1112,6 +1142,7 @@ function decorateHostNoteTarget(element, metadata, kind) {
   element.dataset.speakerId = hostId;
   element.dataset.tableId = tableId;
   element.dataset.roundIndex = roundIndex;
+  element.dataset.sourceType = kind;
 }
 
 function renderAgentMessage({
@@ -1220,7 +1251,7 @@ function renderSeatMemoryCard(agentName, roleTag, snapshot) {
       .join("");
     if (rounds) sections.push(rounds);
   } else if (snapshot) {
-    if (snapshot.personal_insight && snapshot.personal_insight !== "暂无迁移记忆。") {
+    if (snapshot.personal_insight && snapshot.personal_insight !== "No migration memory yet.") {
       sections.push(`<div class="smc-section"><div class="smc-section-title">🧠 personal_insight</div><div class="smc-section-body">${escapeHtml(snapshot.personal_insight)}</div></div>`);
     }
   }
@@ -1268,13 +1299,13 @@ function formatMemorySnapshot(snapshot) {
   const rows = [];
   if (snapshot.kind === "table_host") {
     (snapshot.recent_rounds || []).forEach((round) => {
-      addListRows(rows, `第 ${round.round} 轮重复主题`, round.repeated_themes);
-      addListRows(rows, `第 ${round.round} 轮少数启发`, round.minority_inspiring_views);
-      addListRows(rows, `第 ${round.round} 轮未解张力`, round.unresolved_tensions);
+      addListRows(rows, `Round ${round.round} recurring themes`, round.repeated_themes);
+      addListRows(rows, `Round ${round.round} minority signals`, round.minority_inspiring_views);
+      addListRows(rows, `Round ${round.round} unresolved tensions`, round.unresolved_tensions);
     });
     return rows;
   }
-  if (snapshot.personal_insight && snapshot.personal_insight !== "暂无迁移记忆。") {
+  if (snapshot.personal_insight && snapshot.personal_insight !== "No migration memory yet.") {
     rows.push(`personal_insight: ${snapshot.personal_insight}`);
   }
   return rows;
@@ -1356,6 +1387,7 @@ function scrollTableToBottom(round, shouldScroll = true) {
 
 function renderHarvest(markdown) {
   harvestContent.classList.remove("muted");
+  harvestContent.dataset.sourceType = "harvest";
   harvestContent.innerHTML = renderMarkdownLite(markdown || "No harvest generated.");
   expandBottomPanel("harvest");
 }
@@ -1384,7 +1416,7 @@ function resetRunView() {
   document.querySelectorAll(".table-card").forEach(card => card.classList.remove("gated-pulse"));
   traceCount.textContent = "0 events";
   harvestContent.classList.add("muted");
-  harvestContent.textContent = "等待讨论完成";
+  harvestContent.textContent = "Waiting for the discussion to finish";
   tablesGrid.innerHTML = "";
   resetAgentRoleStatuses();
   renderNotebook();
@@ -1516,8 +1548,8 @@ function isNoteTakingActive() {
 function refreshNoteTakingControls() {
   discussionPane.classList.toggle("paused", isNoteTakingActive());
   pauseBtn.disabled = !activeRun || Boolean(activeNoteCheckpoint);
-  pauseBtn.textContent = isPaused ? "继续讨论" : "暂停标注";
-  addNoteBtn.disabled = !isNoteTakingActive() || !pendingNoteSelection;
+  pauseBtn.textContent = isPaused ? "Resume Discussion" : "Pause to Annotate";
+  addNoteBtn.disabled = !canAddNoteFromSelection(pendingNoteSelection);
   if (isNoteTakingActive()) expandBottomPanel("notebook");
   if (activeNoteCheckpoint) {
     renderActiveNoteCheckpoint();
@@ -1576,7 +1608,7 @@ function activateNoteCheckpoint(checkpoint) {
   activeNoteCheckpoint = checkpoint;
   noteCheckpointPanel.hidden = false;
   expandBottomPanel("notebook");
-  setStatus(`待换桌 · ${checkpoint.table_id} R${Number(checkpoint.round_index) + 1}`, "running");
+  setStatus(`Rotation Pending · ${checkpoint.table_id} R${Number(checkpoint.round_index) + 1}`, "running");
   
   // Highlight active checkpoint table card
   document.querySelectorAll(".table-card").forEach(card => card.classList.remove("gated-pulse"));
@@ -1587,9 +1619,9 @@ function activateNoteCheckpoint(checkpoint) {
   }
 
   updateAgentStatus("host", {
-    status: "等待换桌",
-    detail: `${checkpoint.table_id} 已暂停：请完成本轮设计洞察/机会笔记，点击"换桌"后桌长才会生成本轮记忆。`,
-    meta: `第 ${Number(checkpoint.round_index) + 1} 轮`,
+    status: "Waiting To Rotate",
+    detail: `${checkpoint.table_id} is paused. Finish this round's insight and opportunity notes; the host will generate memory after rotation.`,
+    meta: `Round ${Number(checkpoint.round_index) + 1}`,
   });
   ensureRound(checkpoint.table_id, checkpoint.round_index, []);
   refreshNoteTakingControls();
@@ -1626,12 +1658,17 @@ function hideNoteCheckpointPanel() {
 function renderActiveNoteCheckpoint() {
   if (!activeNoteCheckpoint || !noteCheckpointPanel) return;
   const notes = getNotesForCheckpoint(activeNoteCheckpoint);
+  const stats = getNotebookStats(notes);
   const roundLabel = Number(activeNoteCheckpoint.round_index) + 1;
+  const queued = pendingNoteCheckpoints.length ? ` · ${pendingNoteCheckpoints.length} more tables waiting to rotate` : "";
   if (noteCheckpointTitle) {
-    noteCheckpointTitle.textContent = `${activeNoteCheckpoint.table_id} · R${roundLabel} · ${notes.length} 条笔记`;
+    noteCheckpointTitle.textContent = `${activeNoteCheckpoint.table_id} · Round ${roundLabel} · Pre-rotation Notes`;
+  }
+  if (noteCheckpointDetail) {
+    noteCheckpointDetail.textContent = `Finish this table's insight and opportunity notes for the round. After you rotate, the host will use them to generate internal memory and a closing note. ${stats.noteCount} notes / ${stats.highlightCount} highlights will be submitted${queued}.`;
   }
   if (continueNotesBtn) {
-    continueNotesBtn.textContent = notes.length ? "提交并换桌" : "直接换桌";
+    continueNotesBtn.textContent = notes.length ? `Submit ${stats.noteCount} Notes And Rotate` : "Rotate Without Notes";
   }
 }
 
@@ -1653,6 +1690,14 @@ async function submitActiveNoteCheckpoint() {
       status: "Generating Host Memory",
       detail: `${checkpoint.table_id}'s host is combining user-marked notes into internal memory before closing the round.`,
       meta: `${notes.length} notes · switch table`,
+    });
+    recordUserAction("notes_submitted", {
+      checkpoint_id: checkpoint.checkpoint_id,
+      table_id: checkpoint.table_id,
+      round_index: Number(checkpoint.round_index),
+      note_count: notes.length,
+      highlight_count: notes.reduce((count, note) => count + (Number(note.highlight_count) || 0), 0),
+      notes,
     });
     finishNoteCheckpoint(checkpoint.checkpoint_id);
   } catch (error) {
@@ -1680,6 +1725,7 @@ function noteToPayload(entry) {
     speaker_id: entry.speakerId,
     speech_id: entry.speechId,
     speech_target_id: entry.speechTargetId,
+    highlight_count: entry.highlightCount,
     created_at: entry.createdAt,
   };
 }
@@ -1694,12 +1740,14 @@ function getSelectedDiscussionSelection() {
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
   const text = selection.toString().trim();
   if (!text) return null;
-  const anchorSpeech = getClosestSpeech(selection.anchorNode);
-  const focusSpeech = getClosestSpeech(selection.focusNode);
-  if (!anchorSpeech || anchorSpeech !== focusSpeech) return null;
+  const anchorSource = getClosestNoteSource(selection.anchorNode);
+  const focusSource = getClosestNoteSource(selection.focusNode);
+  if (!anchorSource || anchorSource !== focusSource) return null;
   return {
     text,
-    speech: anchorSpeech,
+    source: anchorSource,
+    speech: anchorSource,
+    sourceType: anchorSource.dataset.sourceType || "speech",
     range: selection.getRangeAt(0).cloneRange(),
   };
 }
@@ -1710,12 +1758,29 @@ function getClosestSpeech(node) {
   return element?.closest(".speech, .host-opening, .host-record") || null;
 }
 
+function getClosestNoteSource(node) {
+  if (!node) return null;
+  const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+  return element?.closest(".speech, .host-opening, .host-record, #harvestContent") || null;
+}
+
+function canAddNoteFromSelection(selectionInfo) {
+  if (!selectionInfo) return false;
+  if (selectionInfo.sourceType === "harvest") return !harvestContent.classList.contains("muted");
+  return isNoteTakingActive();
+}
+
 function addSelectedNote() {
   const selectionInfo = getSelectedDiscussionSelection() || pendingNoteSelection;
-  if (!selectionInfo) return;
-  const { text, speech, range } = selectionInfo;
+  if (!canAddNoteFromSelection(selectionInfo)) return;
+  const { text, source, sourceType, range } = selectionInfo;
+  const speech = source;
   const noteId = `note-${++noteSequence}`;
   const highlighted = highlightSelectionRange(range, noteId);
+  if (!highlighted?.highlightCount) {
+    addMessage("error", "The selected text could not be highlighted. Please select it again before adding a note.");
+    return;
+  }
   const roundBlock = speech.closest("[data-round-index]");
   const tableCard = speech.closest("[data-table-id]");
   const tableId = speech.dataset.tableId || tableCard?.dataset.tableId || activeNoteCheckpoint?.table_id || "";
@@ -1726,17 +1791,29 @@ function addSelectedNote() {
   const noteEntry = {
     id: noteId,
     text,
-    speakerName: speech.dataset.speakerName || "Unknown speaker",
+    sourceType,
+    speakerName: speech.dataset.speakerName || (sourceType === "harvest" ? "Global Harvest" : "Unknown speaker"),
     speakerId: speech.dataset.speakerId || "",
     tableId,
     roundIndex,
     speechId: speech.id,
-    speechTargetId: highlighted?.id || speech.id,
+    speechTargetId: highlighted.element?.id || speech.id,
+    highlightCount: highlighted.highlightCount,
     round: Number.isFinite(roundIndex) ? roundIndex + 1 : currentRound,
-    createdAt: new Date().toLocaleTimeString(),
+    createdAt: formatActivityTime(),
   };
   notebookEntries = [...notebookEntries, noteEntry];
-  recordUserAction("note_added", noteToLogEntry(noteEntry));
+  recordUserAction("note_highlighted", {
+    note_id: noteId,
+    text,
+    sourceType: sourceType || "speech",
+    table_id: tableId,
+    round_index: Number.isFinite(roundIndex) ? roundIndex : null,
+    speaker_name: speech.dataset.speakerName || (sourceType === "harvest" ? "Global Harvest" : "Unknown speaker"),
+    speaker_id: speech.dataset.speakerId || "",
+    speech_id: speech.id,
+    highlight_count: highlighted.highlightCount,
+  });
   window.getSelection()?.removeAllRanges();
   pendingNoteSelection = null;
   renderNotebook();
@@ -1745,7 +1822,8 @@ function addSelectedNote() {
 }
 
 function renderNotebook() {
-  notebookCount.textContent = `已记录 ${notebookEntries.length} 条笔记`;
+  const stats = getNotebookStats();
+  notebookCount.textContent = `${stats.noteCount} notes · ${stats.highlightCount} highlights`;
   notebookList.innerHTML = "";
   notebookEntries.forEach((entry, index) => {
     const item = document.createElement("button");
@@ -1753,7 +1831,7 @@ function renderNotebook() {
     item.className = "notebook-entry";
     item.dataset.noteTarget = entry.id;
     item.innerHTML = `
-      <div class="notebook-entry-meta">#${index + 1} · ${escapeHtml(entry.tableId || "?")} · ${escapeHtml(entry.speakerName)} · Round ${entry.round || "?"} · ${escapeHtml(entry.createdAt)}</div>
+      <div class="notebook-entry-meta">#${index + 1} · ${escapeHtml(entry.tableId || "?")} · ${escapeHtml(entry.speakerName)} · Round ${entry.round || "?"} · ${entry.highlightCount || 0} highlights · ${escapeHtml(entry.createdAt)}</div>
       <p>${escapeHtml(entry.text)}</p>
     `;
     item.addEventListener("click", () => jumpToNote(entry));
@@ -1762,22 +1840,23 @@ function renderNotebook() {
 }
 
 function highlightSelectionRange(range, noteId) {
-  const speech = getClosestSpeech(range.commonAncestorContainer);
-  if (!speech) return null;
+  const noteSource = getClosestNoteSource(range.commonAncestorContainer);
+  if (!noteSource) return null;
   const simpleMark = document.createElement("mark");
   simpleMark.className = "user-note-highlight";
   simpleMark.dataset.noteId = noteId;
   try {
     simpleMark.append(range.extractContents());
     range.insertNode(simpleMark);
-    return simpleMark;
+    return { element: simpleMark, highlightCount: 1 };
   } catch {
     simpleMark.remove();
   }
 
   const textNodes = [];
+  const marks = [];
   const walker = document.createTreeWalker(
-    speech,
+    noteSource,
     NodeFilter.SHOW_TEXT,
     {
       acceptNode(node) {
@@ -1805,8 +1884,9 @@ function highlightSelectionRange(range, noteId) {
     mark.dataset.noteId = noteId;
     selected.parentNode.insertBefore(mark, after);
     mark.append(selected);
+    marks.push(mark);
   });
-  return document.querySelector(`[data-note-id="${noteId}"]`);
+  return marks.length ? { element: marks[0], highlightCount: marks.length } : null;
 }
 
 function jumpToNote(entry) {
@@ -1878,17 +1958,26 @@ function recordUserAction(type, details = {}) {
       type,
       timestamp: new Date().toISOString(),
       run_id: activeRun?.run_id || "",
-      current_round: currentRound,
+      current_round: getCurrentActivityRound(),
       active_checkpoint: activeNoteCheckpoint
         ? {
             checkpoint_id: activeNoteCheckpoint.checkpoint_id,
             table_id: activeNoteCheckpoint.table_id,
-            round_index: activeNoteCheckpoint.round_index,
+            round_index: Number(activeNoteCheckpoint.round_index),
           }
         : null,
       details,
     },
   ];
+}
+
+function getCurrentActivityRound() {
+  if (activeNoteCheckpoint) return Number(activeNoteCheckpoint.round_index) + 1;
+  return currentRound || 0;
+}
+
+function formatActivityTime() {
+  return new Date().toLocaleTimeString("en-US", { hour12: false });
 }
 
 function getButtonLabel(button) {
@@ -1924,20 +2013,31 @@ function getGlobalHarvestExport() {
   };
 }
 
-function getNotebookStats() {
+function getNotebookStats(entries = notebookEntries) {
   const byTable = {};
   const byRound = {};
-  notebookEntries.forEach((entry) => {
+  let highlightCount = 0;
+  entries.forEach((entry) => {
     const tableKey = entry.tableId || "unknown";
     const roundKey = Number.isFinite(Number(entry.roundIndex)) ? String(Number(entry.roundIndex) + 1) : "unknown";
     byTable[tableKey] = (byTable[tableKey] || 0) + 1;
     byRound[roundKey] = (byRound[roundKey] || 0) + 1;
+    const storedCount = Number(entry.highlightCount) || 0;
+    const liveCount = countNoteHighlightElements(entry.id);
+    highlightCount += Math.max(storedCount, liveCount);
   });
   return {
-    total: notebookEntries.length,
+    total: entries.length,
+    noteCount: entries.length,
+    highlightCount,
     by_table: byTable,
     by_round: byRound,
   };
+}
+
+function countNoteHighlightElements(noteId) {
+  if (!noteId) return 0;
+  return document.querySelectorAll(`[data-note-id="${noteId}"]`).length;
 }
 
 function getRunLogSummary() {
@@ -1956,6 +2056,7 @@ function noteToLogEntry(entry) {
   return {
     id: entry.id,
     text: entry.text,
+    source_type: entry.sourceType || "speech",
     table_id: entry.tableId,
     round_index: Number(entry.roundIndex),
     round: entry.round,
@@ -1963,6 +2064,7 @@ function noteToLogEntry(entry) {
     speaker_id: entry.speakerId,
     speech_id: entry.speechId,
     speech_target_id: entry.speechTargetId,
+    highlight_count: entry.highlightCount,
     created_at: entry.createdAt,
   };
 }

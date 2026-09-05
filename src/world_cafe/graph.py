@@ -266,7 +266,7 @@ def _make_table_discussion_node(llm: CafeLLM, pause_check: PauseCheck, note_chec
             question_seeds=opening_seeds,
         )
         emit_stream_event(opening_event)
-        conversation.append(f"[桌长开场] {host_opening}")
+        conversation.append(f"[Host opening] {host_opening}")
 
         async def ask_agent(agent: AgentProfile, turn_index: int, cycle_index: int) -> dict[str, Any]:
             system, user = contribution_prompt(
@@ -474,6 +474,21 @@ def _collect_round(state: WorldCafeState) -> dict[str, Any]:
             or memory.get("tablememory_usage_description")
             or TABLEMEMORY_USAGE_DESCRIPTION
         )
+        memory["rounds"] = [
+            *list(memory.get("rounds") or []),
+            {
+                "round_index": output["round_index"],
+                "agent_ids": output["agent_ids"],
+                "host_opening": output.get("host_opening", ""),
+                "synthesis": output["synthesis"],
+                "key_insights": _string_list(formatmemory_record.get("repeated_themes")),
+                "open_questions": memory["next_round_question_seeds"],
+                "tensions": _string_list(formatmemory_record.get("unresolved_tensions")),
+                "table_memory_update": memory_update,
+                "carry_over_packets": output.get("carry_over_packets", []),
+                "user_notes": output.get("user_notes", []),
+            },
+        ]
         updated_memories[output["table_id"]] = memory
         table_summaries[output["table_id"]] = synthesis_summary
         host_openings.append(
@@ -673,33 +688,26 @@ def _parse_structured_harvest(content: str) -> dict[str, Any]:
 
 def _harvest_display_content(content: str, structured_harvest: dict[str, Any]) -> str:
     display = str(structured_harvest.get("display_markdown") or "").strip()
-    if display:
+    if display and _is_three_design_insight_markdown(display):
         return emphasize_design_opportunities(_limit_harvest_display(display))
     try:
         loads_jsonish_object(content)
     except Exception:
-        return emphasize_design_opportunities(_limit_harvest_display(content))
-    return emphasize_design_opportunities(_limit_harvest_display(_format_structured_harvest_markdown(structured_harvest)))
+        if _is_three_design_insight_markdown(content):
+            return emphasize_design_opportunities(_limit_harvest_display(content))
+        return emphasize_design_opportunities(_limit_harvest_display(_format_structured_harvest_markdown(structured_harvest)))
     return emphasize_design_opportunities(_limit_harvest_display(_format_structured_harvest_markdown(structured_harvest)))
 
 
 def _format_structured_harvest_markdown(harvest: dict[str, Any]) -> str:
-    lines = ["## 全局设计洞察"]
-    needs = _coerce_items(harvest.get("user_needs"))
-    problem = _coerce_text(harvest.get("reframed_design_problem"))
-    directions = _limit_items(_coerce_items(harvest.get("next_design_directions")), 3)
-    lines.append("")
-    lines.append("### 用户主要需求")
-    lines.append(", ".join(needs) if needs else "暂无")
-    lines.append("")
-    lines.append("### 设计问题重新界定")
-    lines.append(problem or "暂无")
-    lines.append("")
-    lines.append("### 后续设计方向")
-    for d in directions:
-        lines.append(f"- {d}")
-    if not directions:
-        lines.append("暂无")
+    insights = _design_insights_from_harvest(harvest)
+    lines = ["Design Insights:"]
+    for index, insight in enumerate(insights, start=1):
+        lines.append("")
+        lines.append(f"### Insight {index}")
+        lines.append(f"1. User need: {insight['user_need']}")
+        lines.append(f"2. Reframed design problem: {insight['reframed_design_problem']}")
+        lines.append(f"3. Up to three next design directions: {insight['design_direction']}")
     return "\n".join(lines)
 
 
@@ -975,8 +983,38 @@ def _host_memory_snapshot(memory: TableMemory, update: dict[str, Any] | None = N
             }
         )
         recent_rounds = recent_rounds[-4:]
+    key_insights = unique_append(
+        _string_list(current.get("repeated_themes")),
+        _string_list(current.get("minority_inspiring_views")),
+    )
     return {
         "kind": "table_host",
+        "tablememory_usage_description": str(
+            update.get("tablememory_usage_description")
+            or memory.get("tablememory_usage_description")
+            or TABLEMEMORY_USAGE_DESCRIPTION
+        ),
+        "living_summary": _limit_visible_text(
+            str(update.get("synthesis") or _formatmemory_summary(current) or memory.get("living_summary") or "None yet."),
+            180,
+        ),
+        "formatmemory": current,
+        "key_insights": key_insights[:4],
+        "open_questions": (
+            _string_list(update.get("next_round_question_seeds"))
+            or _string_list(memory.get("next_round_question_seeds"))
+        )[:4],
+        "tensions": _string_list(current.get("unresolved_tensions"))[:4],
+        "stable_patterns": _string_list(current.get("repeated_themes"))[:4],
+        "incomplete_or_weak_patterns": _string_list(current.get("minority_inspiring_views"))[:4],
+        "recurring_patterns_across_rounds": _string_list(current.get("repeated_themes"))[:4],
+        "emerging_or_fading_signals": _string_list(current.get("minority_inspiring_views"))[:4],
+        "unresolved_tensions_over_time": _string_list(current.get("unresolved_tensions"))[:4],
+        "round_pattern_delta": _limit_visible_text(_formatmemory_summary(current), 180),
+        "next_round_question_seeds": (
+            _string_list(update.get("next_round_question_seeds"))
+            or _string_list(memory.get("next_round_question_seeds"))
+        )[:4],
         "recent_rounds": recent_rounds,
     }
 
@@ -995,7 +1033,7 @@ def _speaker_memory_snapshot(
         insight = agent_memory.strip()
     return {
         "kind": "speaking_agent",
-        "personal_insight": insight or "暂无迁移记忆。",
+        "personal_insight": insight or "No migration memory yet.",
     }
 
 
@@ -1034,8 +1072,8 @@ def _format_host_record_display(memory_update: dict[str, Any], fallback: str) ->
             return emphasize_design_opportunities(display)
 
     if not _looks_structured(fallback):
-        return emphasize_design_opportunities(_natural_text(fallback) or "桌长已更新本桌记忆。")
-    return "桌长已更新本桌记忆：本轮讨论先保留为内部结构化记录，下一轮将继续围绕这些线索追问。"
+        return emphasize_design_opportunities(_natural_text(fallback) or "The host updated this table's memory.")
+    return "The host updated this table's memory. This round is stored as an internal structured record, and the next round will continue probing these cues."
 
 
 def _format_host_closing_display(content: str, memory_update: dict[str, Any], fallback: str) -> str:
@@ -1124,6 +1162,7 @@ def _empty_table_memory(table_id: str, question: str, host_id: str) -> TableMemo
         "tablememory_usage_description": TABLEMEMORY_USAGE_DESCRIPTION,
         "formatmemory": [],
         "next_round_question_seeds": [],
+        "rounds": [],
     }
 
 

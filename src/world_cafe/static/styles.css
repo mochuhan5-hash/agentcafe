@@ -27,8 +27,8 @@
   --blue-soft: rgba(233, 248, 249, 0.72);
   --shadow: 0 9px 20px rgba(32, 39, 45, 0.04), 0 1px 0 rgba(255, 255, 255, 0.82) inset;
   --center-shadow: 0 5px 12px rgba(32, 39, 45, 0.1), 0 1px 0 rgba(255, 255, 255, 0.82) inset;
-  --font-sans: Inter, "SF Pro Text", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-display: var(--font-sans);
+  --font-sans: "Helvetica Neue", Helvetica, "Microsoft YaHei", Arial, sans-serif;
+  --font-display: "Avenir Next", "Helvetica Neue", Helvetica, "Microsoft YaHei", Arial, sans-serif;
 }
 
 * {

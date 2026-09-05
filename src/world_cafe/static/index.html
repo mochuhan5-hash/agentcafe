@@ -5,10 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Agent Cafe</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23ffde96'/%3E%3Cpath d='M19 24h28v16a10 10 0 0 1-10 10h-8a10 10 0 0 1-10-10V24Z' fill='%23fff4d8' stroke='%23c93638' stroke-width='4'/%3E%3Cpath d='M47 28h3a7 7 0 0 1 0 14h-3' fill='none' stroke='%23c93638' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M25 12v6M33 12v6M41 12v6' stroke='%2362c4da' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E" />
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Space+Grotesk:wght@300..700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/styles.css?v=20260612-notes-export-1" />
+    <link rel="stylesheet" href="/static/styles.css?v=20260905-layout-english-1" />
   </head>
   <body>
     <div class="app-shell mode-config">
@@ -55,11 +52,11 @@
 
               <div class="settings-panel" aria-label="Flow settings">
                 <label>
-                  <span>桌数</span>
+                  <span>Tables</span>
                   <input id="tableCount" type="number" min="1" max="8" value="3" />
                 </label>
                 <label>
-                  <span>每桌发言人数</span>
+                  <span>Speakers Per Table</span>
                   <input id="speakersPerTable" type="number" min="1" max="8" value="2" />
                 </label>
                 <label>
@@ -76,9 +73,9 @@
                       <polyline points="17 8 12 3 7 8" />
                       <line x1="12" y1="3" x2="12" y2="15" />
                     </svg>
-                    <span>背景材料（Markdown，可选）</span>
+                    <span>Brief / Background Material (common text formats, optional)</span>
                   </label>
-                  <input id="backgroundFile" type="file" accept=".md,.markdown,.txt,text/markdown,text/plain" />
+                  <input id="backgroundFile" type="file" accept=".md,.markdown,.txt,.text,.csv,.tsv,.json,.jsonl,.yaml,.yml,.xml,.html,.htm,.rtf,.log,text/*,application/json,application/xml,application/rtf,text/rtf" />
                   <div class="background-meta">
                     <span id="backgroundSummary">No background file uploaded</span>
                     <button type="button" class="secondary" id="chooseBackgroundBtn">Choose File</button>
@@ -132,43 +129,44 @@
         </section>
       </main>
 
-      <section class="bottom-panel" id="bottomPanel" aria-label="底部面板">
+      <section class="bottom-panel" id="bottomPanel" aria-label="Bottom panel">
         <div class="bottom-panel-tabs">
           <button type="button" class="bottom-tab active" data-tab="notebook">
-            <span>📒</span> 设计笔记本
+            <span>📒</span> Design Notebook
             <span id="notebookCount" class="badge">0</span>
           </button>
           <button type="button" class="bottom-tab" data-tab="harvest">
-            <span>🌾</span> 全局成果收获
+            <span>🌾</span> Global Harvest
             <span id="traceCount" class="badge">0</span>
           </button>
           <button type="button" class="bottom-tab" data-tab="opportunities">
-            <span>💡</span> 最终提交
+            <span>💡</span> Final Submission
           </button>
           <button type="button" class="bottom-panel-toggle" id="bottomPanelToggle">▲</button>
         </div>
         <div class="bottom-panel-body">
           <div class="bottom-tab-content active" data-tab="notebook">
             <div id="noteCheckpointPanel" class="note-checkpoint-panel" hidden>
-              <strong id="noteCheckpointTitle">换桌前笔记</strong>
-              <button type="button" id="continueNotesBtn">换桌</button>
+              <strong id="noteCheckpointTitle">Finish notes before rotating tables</strong>
+              <p id="noteCheckpointDetail">Finish this table's insight and opportunity notes for the round. The host will generate memory after you rotate.</p>
+              <button type="button" id="continueNotesBtn">Rotate Table</button>
             </div>
             <div class="notebook-right">
-              <button type="button" class="secondary notebook-add-btn" id="addNoteBtn" disabled>+ 加入笔记</button>
+              <button type="button" class="secondary notebook-add-btn" id="addNoteBtn" disabled>Add Note</button>
               <div id="notebookList" class="notebook-list"></div>
             </div>
           </div>
           <div class="bottom-tab-content" data-tab="harvest">
-            <div id="harvestContent" class="markdown-lite muted">等待讨论完成</div>
+            <div id="harvestContent" class="markdown-lite muted">Waiting for the discussion to finish</div>
           </div>
-          <div class="bottom-tab-content" data-tab="opportunities">
+          <div class="bottom-tab-content" data-tab="opportunities" aria-label="Design opportunity insights">
             <div class="opportunity-grid final-submit-grid">
-              <label><span>用户需求</span><textarea rows="4" data-final-insight="user_needs" placeholder="写下用户主要需求..."></textarea></label>
-              <label><span>设计问题</span><textarea rows="4" data-final-insight="design_problem" placeholder="写下重新界定后的设计问题..."></textarea></label>
-              <label><span>设计方向</span><textarea rows="4" data-final-insight="design_direction" placeholder="写下后续设计方向..."></textarea></label>
+              <label><span>Insight 1</span><textarea rows="4" data-final-insight="user_needs" placeholder="Capture a structured insight: user need / problem reframe / design direction..."></textarea></label>
+              <label><span>Insight 2</span><textarea rows="4" data-final-insight="design_problem" placeholder="Capture a structured insight: user need / problem reframe / design direction..."></textarea></label>
+              <label><span>Insight 3</span><textarea rows="4" data-final-insight="design_direction" placeholder="Capture a structured insight: user need / problem reframe / design direction..."></textarea></label>
             </div>
             <div class="final-submit-actions">
-              <button type="button" class="secondary" id="downloadActivityLogBtn">下载日志</button>
+              <button type="button" class="secondary" id="downloadActivityLogBtn">Download Log</button>
             </div>
           </div>
         </div>
@@ -201,6 +199,6 @@
       </div>
     </div>
 
-    <script src="/static/app.js?v=20260612-notes-export-2" type="module"></script>
+    <script src="/static/app.js?v=20260905-layout-english-1" type="module"></script>
   </body>
 </html>

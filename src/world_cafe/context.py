@@ -55,7 +55,7 @@ def parent_question_from_spec(question: str, table_spec: TableSpec | dict[str, A
 
 def format_carry_over_packet(packet: CarryOverPacket | dict[str, Any] | None) -> str:
     if not packet:
-        return "暂无。"
+        return "None yet."
     agent_memory = packet.get("agent_generated_memory")
     if isinstance(agent_memory, dict):
         insight = str(agent_memory.get("personal_insight") or "").strip()
@@ -63,7 +63,7 @@ def format_carry_over_packet(packet: CarryOverPacket | dict[str, Any] | None) ->
         insight = agent_memory.strip()
     else:
         insight = ""
-    return f"personal_insight: {insight}" if insight else "暂无。"
+    return f"personal_insight: {insight}" if insight else "None yet."
 
 
 def format_background(background_context: str) -> str:
@@ -113,52 +113,63 @@ def format_closing_context(memory_update: dict[str, Any]) -> str:
 
 def _format_speaker_memory(memory: TableMemory) -> str:
     lines = [
-        _line("桌子问题", memory.get("question")),
-        _block("所有轮次 formatmemory", _formatmemory_digest(memory, limit=99), limit=99),
-        _block("下一轮问题种子", memory.get("next_round_question_seeds"), limit=4),
+        _line("tablememory usage", _tablememory_usage_description(memory)),
+        _line("Table question", memory.get("question")),
+        _line("Living memory summary", memory.get("living_summary")),
+        _block("Recent formatmemory", _formatmemory_digest(memory, limit=2, compact=True), limit=2),
+        _block("Next-round question seeds", memory.get("next_round_question_seeds"), limit=2),
     ]
     return _join(lines)
 
 
 def _format_host_opening_memory(memory: TableMemory) -> str:
     lines = [
-        _line("桌子问题", memory.get("question")),
-        _block("所有轮次 formatmemory", _formatmemory_digest(memory, limit=99), limit=99),
-        _block("下一轮问题种子", memory.get("next_round_question_seeds"), limit=4),
+        _line("tablememory usage", _tablememory_usage_description(memory)),
+        _line("Table question", memory.get("question")),
+        _line("Living memory summary", memory.get("living_summary")),
+        _block("Recorded formatmemory", _formatmemory_digest(memory, limit=3), limit=3),
+        _block("Next-round question seeds", memory.get("next_round_question_seeds"), limit=4),
     ]
     return _join(lines)
 
 
 def _format_host_synthesis_memory(memory: TableMemory) -> str:
     lines = [
-        _line("tablememory 使用说明", _tablememory_usage_description(memory)),
-        _line("桌子问题", memory.get("question")),
-        _block("已完成轮次 formatmemory", _formatmemory_digest(memory, limit=4), limit=4),
-        _block("下一轮问题种子", memory.get("next_round_question_seeds"), limit=4),
+        _line("tablememory usage", _tablememory_usage_description(memory)),
+        _line("Table question", memory.get("question")),
+        _line("Living memory summary", memory.get("living_summary")),
+        _block("Completed-round formatmemory", _formatmemory_digest(memory, limit=4), limit=4),
+        _block("Next-round question seeds", memory.get("next_round_question_seeds"), limit=4),
     ]
     return _join(lines)
 
 
 def _format_host_closing_memory(memory: TableMemory) -> str:
     lines = [
-        _line("桌子问题", memory.get("question")),
-        _block("最近 formatmemory", _formatmemory_digest(memory, limit=1), limit=1),
-        _block("下一轮问题种子", memory.get("next_round_question_seeds"), limit=3),
+        _line("tablememory usage", _tablememory_usage_description(memory)),
+        _line("Table question", memory.get("question")),
+        _line("Living memory summary", memory.get("living_summary")),
+        _block("Recent formatmemory", _formatmemory_digest(memory, limit=1), limit=1),
+        _block("Next-round question seeds", memory.get("next_round_question_seeds"), limit=3),
     ]
     return _join(lines)
 
 
 def _format_packet_source_memory(memory: TableMemory) -> str:
     lines = [
-        _line("来源桌问题", memory.get("question")),
-        _block("来源桌最近 formatmemory", _formatmemory_digest(memory, limit=1), limit=1),
+        _line("tablememory usage", _tablememory_usage_description(memory)),
+        _line("Source table question", memory.get("question")),
+        _line("Source table living memory summary", memory.get("living_summary")),
+        _block("Source table recent formatmemory", _formatmemory_digest(memory, limit=1), limit=1),
     ]
     return _join(lines)
 
 
 def _format_harvest_memory(memory: TableMemory) -> str:
     lines = [
-        _line("桌子问题", memory.get("question")),
+        _line("tablememory usage", _tablememory_usage_description(memory)),
+        _line("Table question", memory.get("question")),
+        _line("Living memory summary", memory.get("living_summary")),
         _block("formatmemory", _formatmemory_digest(memory, limit=4), limit=4),
         _block("Question seeds", memory.get("next_round_question_seeds"), limit=3),
     ]
@@ -167,7 +178,9 @@ def _format_harvest_memory(memory: TableMemory) -> str:
 
 def _format_full_memory(memory: TableMemory) -> str:
     lines = [
-        _line("桌子问题", memory.get("question")),
+        _line("tablememory usage", _tablememory_usage_description(memory)),
+        _line("Table question", memory.get("question")),
+        _line("Living memory summary", memory.get("living_summary")),
         _block("formatmemory", _formatmemory_digest(memory, limit=6), limit=6),
         _block("Next-round question seeds", memory.get("next_round_question_seeds"), limit=8),
     ]
