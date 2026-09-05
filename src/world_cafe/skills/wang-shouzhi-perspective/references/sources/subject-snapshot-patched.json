@@ -1,0 +1,385 @@
+{
+  "subject": "王受之",
+  "pinyin": "Wang Shouzhi",
+  "english_name": "Wang Shou-zhi / Wang Shouzhi",
+  "compiled_at": "2026-05-12",
+  "compiled_by": "原: CodeBuddy agent + web_search 多源交叉验证 / 增量: 阿特拉斯 (人物蒸馏专家团) 2026-05-12 SN001-006 补丁",
+  "status_policy": "本文件是【身份锚点·事实层】，女娲蒸馏产物的「当下事实」必须从此处取，不要从语料正文推断；语料正文主要用于蒸馏【思维方式·语言风格·价值判断】。",
+  "current_snapshot": {
+    "as_of": "2026-05",
+    "age": 80,
+    "birth": {
+      "year": 1946,
+      "place": "广东广州"
+    },
+    "nationality": "美籍华人",
+    "primary_role": {
+      "title": "上海科技大学创意与艺术学院副院长、常任教授、博士生导师",
+      "organization": "上海科技大学 (ShanghaiTech University) 创意与艺术学院 (School of Creativity and Art, SCA)",
+      "since": "2019-09",
+      "location": "上海·张江",
+      "evidence": [
+        "https://sca.shanghaitech.edu.cn/2019/0829/c7862a56628/page.htm",
+        "https://baike.baidu.com/item/王受之/1126666",
+        "《设计》杂志 2026-03 深度专访"
+      ]
+    },
+    "concurrent_roles": [
+      {
+        "title": "智能虚拟设计实验室主任",
+        "organization": "上海科技大学"
+      },
+      {
+        "title": "客座教授",
+        "organization": "中央美术学院"
+      },
+      {
+        "title": "客座教授",
+        "organization": "清华大学美术学院"
+      },
+      {
+        "title": "客座教授",
+        "organization": "鲁迅美术学院"
+      },
+      {
+        "title": "客座教授",
+        "organization": "上海大学美术学院"
+      },
+      {
+        "title": "客座教授",
+        "organization": "汕头大学长江艺术与设计学院"
+      },
+      {
+        "title": "首批导师",
+        "organization": "沐光大师学院",
+        "since": "2026-03"
+      }
+    ],
+    "focus_2025_2026": [
+      "AI 对现代设计的影响",
+      "中国汽车设计教育的自主化",
+      "数字时代的设计未来",
+      "现代艺术史写作（他本人透露有意继贡布里希之后重写一部艺术史）",
+      "AI 对现代设计的四维影响（技术-媒介-审美-社会，2026-Q1）"
+    ],
+    "health_status": "截至 2026-04 仍密集讲学、接受专访，身体状况良好",
+    "awards": [
+      "光华龙腾奖 · 中国设计贡献奖金奖"
+    ],
+    "b_station_presence": {
+      "paid_course_modern_design_subscribers": "163 万+（自述于 2023 讲座，当下数据可能更高）",
+      "paid_course_architectural_history_subscribers": "80 万+（自述于 2023 讲座）",
+      "self_description": "B 站评为中国最受欢迎的三名学者之一（2022）",
+      "last_verified": "2023-11，V043 讲座自述"
+    },
+    "douyin_followers": "约 12 万（2022 自述）"
+  },
+  "historical_timeline": [
+    {
+      "period": "文革结束后",
+      "event": "考入武汉大学研究生院历史系，研究美国史/中美关系，与易中天（武大中文系）同级",
+      "source": "V031 自述，武大百度百科交叉"
+    },
+    {
+      "period": "1946",
+      "event": "生于广州"
+    },
+    {
+      "period": "1954 夏",
+      "event": "随表妹周荣（国徽设计师周令钊之女）首次进北京故宫看甲骨文",
+      "source": "V043 自述"
+    },
+    {
+      "period": "1979",
+      "event": "考入武汉大学历史系研究生院，研究美国史/中美关系，与易中天同级",
+      "source": "V031 自述 + 武大百度百科交叉"
+    },
+    {
+      "period": "1980s",
+      "event": "任广州美术学院设计系副主任、工业设计研究室副主任"
+    },
+    {
+      "period": "1982",
+      "event": "在广州美术学院开设中国首个现代设计史课程",
+      "source": "V031、V037、博客 2011-05-17"
+    },
+    {
+      "period": "1982",
+      "event": "武汉大学研究生毕业",
+      "source": "V031 + V039 自述"
+    },
+    {
+      "period": "1987",
+      "event": "作为富布赖特学者赴美，在宾夕法尼亚州立大学切斯特学院、威斯康星大学麦迪逊学院研究设计理论"
+    },
+    {
+      "period": "1988-2011",
+      "event": "任教于美国洛杉矶 Art Center College of Design（艺术中心设计学院），从兼职到 1993 升终身教授，约 20 年"
+    },
+    {
+      "period": "1989-1991",
+      "event": "在洛杉矶接触华人流亡/旅居圈子（吴天明、王姬、陈冲、胡金铨、李翰祥）",
+      "source": "S496 博客 B0143 自述"
+    },
+    {
+      "period": "1991-1992",
+      "event": "邀请维克多·帕帕纳克（Victor Papanek）到 Art Center 讲学，于洛杉矶 Little Tokyo 长谈其当年被美国 IDSA 开除事",
+      "source": "V037 自述"
+    },
+    {
+      "period": "1997",
+      "event": "与万科首次合作住宅区项目「俊园」（深圳），命名权由其拍板，开启 20+ 年房地产顾问生涯",
+      "source": "S514 博客 B0149 自述"
+    },
+    {
+      "period": "1997",
+      "event": "在 Art Center 创办「娱乐设计」(Entertainment Design) 选修课，后发展为正式专业",
+      "source": "V031 + V037 自述"
+    },
+    {
+      "period": "2003",
+      "event": "受李嘉诚基金会邀请回国参与创办汕头大学长江艺术与设计学院，任创院院长"
+    },
+    {
+      "period": "2010-12",
+      "event": "在汕头大学开设 12 讲《世界现代设计史》课程录像",
+      "source": "博客 2011-05-17"
+    },
+    {
+      "period": "2011",
+      "event": "开始在新浪博客连载《世界现代设计史》讲稿（实际从 2007-01 就开始写博客）"
+    },
+    {
+      "period": "2012-2018",
+      "event": "二度出任汕头大学长江艺术与设计学院院长",
+      "source": "peer_reviews P002 自述"
+    },
+    {
+      "period": "2018-05",
+      "event": "中央美院艺讯网深度专访，提出「中国是全球设计教育最同质化的国家」标志性论断",
+      "source": "SN006"
+    },
+    {
+      "period": "2019-09",
+      "event": "入职上海科技大学创意与艺术学院，任副院长、智能虚拟设计实验室主任"
+    },
+    {
+      "period": "2022",
+      "event": "B 站将其评为中国最受欢迎的三名学者之一"
+    },
+    {
+      "period": "2022-09",
+      "event": "澳门个展《沧桑》开幕，展出 40 水墨 + 40 钢笔画，画家身份首个系统性公开展",
+      "source": "wechat 多篇印证"
+    },
+    {
+      "period": "2023",
+      "event": "在浦东美术馆与徐冰对谈（徐冰回顾展期间）",
+      "source": "key_associates 已记"
+    },
+    {
+      "period": "2023",
+      "event": "在木心美术馆与陈丹青对谈",
+      "source": "key_associates 已记"
+    },
+    {
+      "period": "2025",
+      "event": "主题讲座焦点转向「AI 对现代设计的影响」，在上海视觉、贵阳图书馆、上海工程技术大学、深圳技术大学等多校密集演讲"
+    },
+    {
+      "period": "2026-03",
+      "event": "《设计》杂志深度专访：中国汽车设计教育"
+    },
+    {
+      "period": "2026-03-20",
+      "event": "受聘沐光大师学院首批导师，与 Aldo Cibic、梁志天、郝洛西等并列",
+      "source": "SN004 / INTERNI 设计时代 2026-03-24"
+    },
+    {
+      "period": "2026-03-21",
+      "event": "主讲上海科技大学科技云讲座《AI 来袭——设计行业的变革与新机遇》，提出技术-媒介-审美-社会四维分析框架",
+      "source": "SN003 / 上科大官网 2026-03-19 公告"
+    },
+    {
+      "period": "2026-04-09",
+      "event": "主讲春醒计划第七期《AI 设计简史》直播，与柳冠中、何人可同期登台",
+      "source": "SN002 / 搜狐 2026-04-10 回顾"
+    },
+    {
+      "period": "2026-04-23",
+      "event": "于上海科技大学生命学院捐赠《春夏秋冬》组画（4 幅×3 米油画），罗振革副校长共同揭幕",
+      "source": "SN001 / 上科大生命学院公众号 2026-04-28"
+    }
+  ],
+  "subject_name_variants_in_asr": {
+    "comment": "ASR 识别王受之名字常错，以下变体应一律替换为'王受之'",
+    "variants": [
+      "王寿芝",
+      "王寿森",
+      "王寿师",
+      "王寿之",
+      "王秀文",
+      "王受芝",
+      "王秀军",
+      "王润之",
+      "王守之",
+      "王寿军",
+      "王寿泽",
+      "汪受之",
+      "王寿"
+    ]
+  },
+  "major_books": [
+    {
+      "title": "《世界现代设计史》(第二版)",
+      "publisher": "中国青年出版社",
+      "year": 2017,
+      "status": "设计类最重要教科书参考书"
+    },
+    {
+      "title": "《世界现代建筑史》(第2版)",
+      "publisher": "中国建筑工业出版社"
+    },
+    {
+      "title": "《世界平面设计史》"
+    },
+    {
+      "title": "《世界时装史》"
+    },
+    {
+      "title": "《世界当代艺术史》"
+    },
+    {
+      "title": "《身边的设计史：为了光明——40个灯具的设计》"
+    },
+    {
+      "title": "《白夜北欧》"
+    },
+    {
+      "title": "《王受之巴黎手记》"
+    },
+    {
+      "title": "《当代商业住宅区的规划与设计》"
+    }
+  ],
+  "key_associates_cross_referenced": [
+    {
+      "name": "易中天",
+      "relation": "武大研究生同级同学（中文系中国史 vs 他的美国史）"
+    },
+    {
+      "name": "陈丹青",
+      "relation": "木心美术馆对谈（2023）"
+    },
+    {
+      "name": "徐冰",
+      "relation": "浦东美术馆对谈（2023 徐冰回顾展期间）"
+    },
+    {
+      "name": "靳埭强",
+      "relation": "侃侃文化对谈（2012）"
+    },
+    {
+      "name": "梁文道",
+      "relation": "侃侃文化对谈《谈谈读书》（2013）"
+    },
+    {
+      "name": "叶锦添",
+      "relation": "侃侃文化对谈（2012）"
+    },
+    {
+      "name": "杭间",
+      "relation": "侃侃文化对谈《追远：中国设计先驱那些事儿》（2016）"
+    },
+    {
+      "name": "柳冠中、何人可",
+      "relation": "卓尔谟春醒计划同台（国内工业设计三巨头）"
+    },
+    {
+      "name": "周令钊",
+      "relation": "表姨父（中华人民共和国国徽主要设计者、第二/三/四套人民币设计师）；其女周荣为王受之表妹"
+    },
+    {
+      "name": "库特勒 Stephen Koether",
+      "relation": "1980 年代影响他美国观的关键记者/学者（《大西洋月刊》）"
+    },
+    {
+      "name": "维克多·帕帕纳克 Victor Papanek",
+      "relation": "他早年邀请到 Art Center 讲学的师友"
+    },
+    {
+      "name": "巴克明斯特·富勒 Buckminster Fuller",
+      "relation": "他引用'处在乌托邦和被遗忘之间的设计'的思想来源"
+    },
+    {
+      "name": "贡布里希 E.H. Gombrich",
+      "relation": "《艺术的故事》作者，他欲在艺术史写作上继其之后另起一部"
+    },
+    {
+      "name": "董作宾",
+      "relation": "甲骨四堂之彦堂，V043 讲座重要参考人物"
+    }
+  ],
+  "citations": [
+    {
+      "url": "https://sca.shanghaitech.edu.cn/2019/0829/c7862a56628/page.htm",
+      "note": "上海科技大学创意与艺术学院常任教授页（2019-08-29 建页）"
+    },
+    {
+      "url": "https://baike.baidu.com/item/王受之/1126666",
+      "note": "百度百科"
+    },
+    {
+      "url": "https://baike.sogou.com/m/fullLemma?lid=4319325",
+      "note": "搜狗百科（2024-09-25 更新）"
+    },
+    {
+      "url": "https://www.siva.edu.cn/2025/0603/c55a16832/page.htm",
+      "note": "上海视觉 2025-05-28 讲座回顾"
+    },
+    {
+      "url": "https://iicd.sues.edu.cn/78/51/c22831a292945/page.htm",
+      "note": "上海工程技术大学 2025-12 讲座报道"
+    },
+    {
+      "url": "https://safa.shu.edu.cn/info/1117/7612.htm",
+      "note": "上海美术学院 2026-04-09 上美讲堂"
+    },
+    {
+      "url": "https://www.uisdc.com/hangye/sheji-wangzhouzhi",
+      "note": "《设计》杂志 2026-03 深度专访"
+    },
+    {
+      "url": "https://mp.weixin.qq.com/s/ZNcWAXCCU-zxPa2HV08BLQ",
+      "note": "SN001 春夏秋冬组画揭幕 2026-04-28"
+    },
+    {
+      "url": "https://www.sohu.com/a/1007937722_121124036",
+      "note": "SN002 AI 设计简史回顾 2026-04-10"
+    },
+    {
+      "url": "http://www.shanghaitech.edu.cn/2026/0319/c14750a1120033/page.htm",
+      "note": "SN003 科技云讲座官方公告 2026-03-19"
+    },
+    {
+      "url": "https://www.interni.net.cn/news/20260324_52632.html",
+      "note": "SN004 沐光大师学院成立 2026-03-24"
+    }
+  ],
+  "patch_history": [
+    {
+      "patch_id": "p1-2026-05-12",
+      "date": "2026-05-12",
+      "by": "persona-wang-shou-zhi team / 阿特拉斯",
+      "note": "基于 SN001/SN002/SN003/SN004 把 as_of 推进到 2026-05，补 4 条 2026-Q1Q2 事实"
+    },
+    {
+      "patch_id": "p2-2026-05-13",
+      "date": "2026-05-13",
+      "by": "persona-wang-shou-zhi / 主理人（基于艾瑞丝 06-timeline 发现）",
+      "note": "追加 10 条已有 S 编号印证的 timeline 事件；严格只动 historical_timeline，不修改 current_snapshot",
+      "added_count": 10,
+      "skipped_count": 0
+    }
+  ]
+}

@@ -213,8 +213,8 @@ async def config() -> dict[str, Any]:
         "base_url": base_url_from_env(),
         "model": model_from_env(),
         "default_rounds": int(os.getenv("WORLD_CAFE_ROUNDS", "3")),
-        "default_table_count": int(os.getenv("WORLD_CAFE_TABLES", "4")),
-        "default_speakers_per_table": int(os.getenv("WORLD_CAFE_SPEAKERS_PER_TABLE", "3")),
+        "default_table_count": int(os.getenv("WORLD_CAFE_TABLES", "3")),
+        "default_speakers_per_table": int(os.getenv("WORLD_CAFE_SPEAKERS_PER_TABLE", "2")),
         "default_speeches_per_agent": int(os.getenv("WORLD_CAFE_SPEECHES_PER_AGENT", "3")),
     }
 
@@ -228,7 +228,7 @@ async def agents(count: int = 32, agents_file: str | None = None) -> dict[str, A
 async def facilitate(body: FacilitateBody) -> dict[str, Any]:
     try:
         timeout = _facilitation_timeout()
-        llm = _build_llm(temperature=0.25, max_tokens=500, timeout=timeout)
+        llm = _build_llm(temperature=0.25, max_tokens=1200, timeout=timeout)
         return await asyncio.wait_for(
             facilitate_request(
                 llm,

@@ -247,6 +247,7 @@ def _make_table_discussion_node(llm: CafeLLM, pause_check: PauseCheck, note_chec
         opening_system, opening_user = host_opening_prompt(
             question=task["question"],
             parent_question=parent_question_from_spec(task["question"], table_spec),
+            round_index=round_index,
             memory=memory,
             background_context=background_context,
         )
@@ -265,6 +266,7 @@ def _make_table_discussion_node(llm: CafeLLM, pause_check: PauseCheck, note_chec
             question_seeds=opening_seeds,
         )
         emit_stream_event(opening_event)
+        conversation.append(f"[桌长开场] {host_opening}")
 
         async def ask_agent(agent: AgentProfile, turn_index: int, cycle_index: int) -> dict[str, Any]:
             system, user = contribution_prompt(
@@ -386,9 +388,9 @@ def _make_table_discussion_node(llm: CafeLLM, pause_check: PauseCheck, note_chec
             host_name=host["name"],
             content=host_record_display,
             memory_snapshot=_host_memory_snapshot(memory, table_memory_update),
-            key_insights=_string_list(table_memory_update.get("key_insights")),
-            open_questions=_string_list(table_memory_update.get("open_questions")),
-            tensions=_string_list(table_memory_update.get("tensions")),
+            key_insights=_string_list((table_memory_update.get("formatmemory") or {}).get("repeated_themes")),
+            open_questions=_string_list(table_memory_update.get("next_round_question_seeds")),
+            tensions=_string_list((table_memory_update.get("formatmemory") or {}).get("unresolved_tensions")),
         )
         emit_stream_event(host_event)
 
@@ -413,9 +415,6 @@ def _make_table_discussion_node(llm: CafeLLM, pause_check: PauseCheck, note_chec
             "host_opening": host_opening,
             "host_record_display": host_record_display,
             "synthesis": synthesis,
-            "key_insights": _string_list(table_memory_update.get("key_insights")),
-            "open_questions": _string_list(table_memory_update.get("open_questions")),
-            "tensions": _string_list(table_memory_update.get("tensions")),
             "table_memory_update": table_memory_update,
             "carry_over_packets": carry_over_packets,
             "user_notes": user_notes,
@@ -465,70 +464,16 @@ def _collect_round(state: WorldCafeState) -> dict[str, Any]:
             or extract_section(output["synthesis"], "synthesis")
             or output["synthesis"]
         )
-        memory["living_summary"] = synthesis_summary
-        memory["key_insights"] = unique_append(memory["key_insights"], output["key_insights"])
-        memory["open_questions"] = unique_append(memory["open_questions"], output["open_questions"])
-        memory["tensions"] = unique_append(memory["tensions"], output["tensions"])
-        memory["stable_patterns"] = unique_append(
-            _string_list(memory.get("stable_patterns")),
-            _string_list(memory_update.get("stable_patterns")),
-        )
-        memory["incomplete_or_weak_patterns"] = unique_append(
-            _string_list(memory.get("incomplete_or_weak_patterns")),
-            _string_list(memory_update.get("incomplete_or_weak_patterns")),
-        )
-        memory["contested_points"] = unique_append(
-            _string_list(memory.get("contested_points")),
-            _string_list(memory_update.get("contested_points")),
-        )
-        memory["blind_spots_or_ambiguities"] = unique_append(
-            _string_list(memory.get("blind_spots_or_ambiguities")),
-            _string_list(memory_update.get("blind_spots_or_ambiguities")),
-        )
-        memory["source_context_anchor"] = _string_list(memory_update.get("source_context_anchor"))
-        memory["cumulative_pattern_evolution"] = str(
-            memory_update.get("cumulative_pattern_evolution")
-            or memory.get("cumulative_pattern_evolution")
-            or ""
-        )
-        memory["recurring_patterns_across_rounds"] = unique_append(
-            _string_list(memory.get("recurring_patterns_across_rounds")),
-            _string_list(memory_update.get("recurring_patterns_across_rounds")),
-        )
-        memory["emerging_or_fading_signals"] = unique_append(
-            _string_list(memory.get("emerging_or_fading_signals")),
-            _string_list(memory_update.get("emerging_or_fading_signals")),
-        )
-        memory["unresolved_tensions_over_time"] = unique_append(
-            _string_list(memory.get("unresolved_tensions_over_time")),
-            _string_list(memory_update.get("unresolved_tensions_over_time")),
-        )
-        memory["round_pattern_delta"] = str(memory_update.get("round_pattern_delta") or "")
+        memory["formatmemory"] = [
+            *_formatmemory_list(memory.get("formatmemory")),
+            formatmemory_record,
+        ]
         memory["next_round_question_seeds"] = _string_list(memory_update.get("next_round_question_seeds"))
         memory["tablememory_usage_description"] = str(
             memory_update.get("tablememory_usage_description")
             or memory.get("tablememory_usage_description")
             or TABLEMEMORY_USAGE_DESCRIPTION
         )
-        memory["formatmemory"] = [
-            *_formatmemory_list(memory.get("formatmemory")),
-            formatmemory_record,
-        ]
-        memory["rounds"] = [
-            *memory["rounds"],
-            {
-                "round_index": output["round_index"],
-                "agent_ids": output["agent_ids"],
-                "host_opening": output.get("host_opening", ""),
-                "synthesis": output["synthesis"],
-                "key_insights": output["key_insights"],
-                "open_questions": output["open_questions"],
-                "tensions": output["tensions"],
-                "table_memory_update": memory_update,
-                "carry_over_packets": output.get("carry_over_packets", []),
-                "user_notes": output.get("user_notes", []),
-            },
-        ]
         updated_memories[output["table_id"]] = memory
         table_summaries[output["table_id"]] = synthesis_summary
         host_openings.append(
@@ -728,29 +673,33 @@ def _parse_structured_harvest(content: str) -> dict[str, Any]:
 
 def _harvest_display_content(content: str, structured_harvest: dict[str, Any]) -> str:
     display = str(structured_harvest.get("display_markdown") or "").strip()
-    if display and _is_three_design_insight_markdown(display):
+    if display:
         return emphasize_design_opportunities(_limit_harvest_display(display))
     try:
         loads_jsonish_object(content)
     except Exception:
-        if _is_three_design_insight_markdown(content):
-            return emphasize_design_opportunities(_limit_harvest_display(content))
-        return emphasize_design_opportunities(_limit_harvest_display(_format_structured_harvest_markdown(structured_harvest)))
+        return emphasize_design_opportunities(_limit_harvest_display(content))
+    return emphasize_design_opportunities(_limit_harvest_display(_format_structured_harvest_markdown(structured_harvest)))
     return emphasize_design_opportunities(_limit_harvest_display(_format_structured_harvest_markdown(structured_harvest)))
 
 
 def _format_structured_harvest_markdown(harvest: dict[str, Any]) -> str:
-    lines = ["Design Insights:"]
-    for index, insight in enumerate(_design_insights_from_harvest(harvest), start=1):
-        lines.extend(
-            [
-                "",
-                f"### Insight {index}",
-                f"1. User need: {_coerce_text(insight.get('user_need')) or 'None yet'}",
-                f"2. Reframed design problem: {_coerce_text(insight.get('reframed_design_problem')) or 'None yet'}",
-                f"3. Up to three next design directions: {_coerce_text(insight.get('design_direction')) or 'None yet'}",
-            ]
-        )
+    lines = ["## 全局设计洞察"]
+    needs = _coerce_items(harvest.get("user_needs"))
+    problem = _coerce_text(harvest.get("reframed_design_problem"))
+    directions = _limit_items(_coerce_items(harvest.get("next_design_directions")), 3)
+    lines.append("")
+    lines.append("### 用户主要需求")
+    lines.append(", ".join(needs) if needs else "暂无")
+    lines.append("")
+    lines.append("### 设计问题重新界定")
+    lines.append(problem or "暂无")
+    lines.append("")
+    lines.append("### 后续设计方向")
+    for d in directions:
+        lines.append(f"- {d}")
+    if not directions:
+        lines.append("暂无")
     return "\n".join(lines)
 
 
@@ -991,47 +940,34 @@ def _limit_visible_text(text: str, limit: int) -> str:
 
 def _host_memory_snapshot(memory: TableMemory, update: dict[str, Any] | None = None) -> dict[str, Any]:
     update = update or {}
+    records = _formatmemory_list(memory.get("formatmemory"))
     current = _normalize_formatmemory_record(
-        update.get("formatmemory") or update or (memory.get("formatmemory") or [{}])[-1],
+        update.get("formatmemory") or (records[-1] if records else {}),
         table_id=str(memory.get("table_id") or ""),
         question=str(memory.get("question") or ""),
         round_index=None,
     )
-    rounds = memory.get("rounds", [])
     recent_rounds = []
-    for item in rounds[-3:]:
-        round_update = item.get("table_memory_update") or {}
-        record = _normalize_formatmemory_record(
-            round_update.get("formatmemory") or round_update,
-            table_id=str(memory.get("table_id") or ""),
-            question=str(memory.get("question") or ""),
-            round_index=item.get("round_index"),
-        )
+    for record in records[-3:]:
+        round_no = record.get("round_index")
         recent_rounds.append(
             {
-                "round": int(item.get("round_index", 0)) + 1,
+                "round": int(round_no) if round_no is not None else "?",
                 "synthesis": _limit_visible_text(_formatmemory_summary(record), 160),
                 "repeated_themes": _string_list(record.get("repeated_themes"))[:3],
                 "minority_inspiring_views": _string_list(record.get("minority_inspiring_views"))[:3],
                 "unresolved_tensions": _string_list(record.get("unresolved_tensions"))[:3],
             }
         )
-    if update:
+    if update and update.get("formatmemory"):
         current_round = current.get("round_index")
-        if current_round is not None:
-            try:
-                current_round_number = int(current_round)
-            except (TypeError, ValueError):
-                current_round_number = len(rounds) + 1
-        else:
-            current_round_number = len(rounds) + 1
         recent_rounds = [
             item for item in recent_rounds
-            if int(item.get("round", 0) or 0) != current_round_number
+            if item.get("round") != current_round
         ]
         recent_rounds.append(
             {
-                "round": current_round_number,
+                "round": current_round or len(records) + 1,
                 "synthesis": _limit_visible_text(_formatmemory_summary(current), 160),
                 "repeated_themes": _string_list(current.get("repeated_themes"))[:3],
                 "minority_inspiring_views": _string_list(current.get("minority_inspiring_views"))[:3],
@@ -1039,38 +975,8 @@ def _host_memory_snapshot(memory: TableMemory, update: dict[str, Any] | None = N
             }
         )
         recent_rounds = recent_rounds[-4:]
-    key_insights = unique_append(
-        _string_list(current.get("repeated_themes")),
-        _string_list(current.get("minority_inspiring_views")),
-    )
     return {
         "kind": "table_host",
-        "tablememory_usage_description": str(
-            update.get("tablememory_usage_description")
-            or memory.get("tablememory_usage_description")
-            or TABLEMEMORY_USAGE_DESCRIPTION
-        ),
-        "living_summary": _limit_visible_text(
-            str(update.get("synthesis") or _formatmemory_summary(current) or memory.get("living_summary") or "None yet."),
-            180,
-        ),
-        "formatmemory": current,
-        "key_insights": key_insights[:4],
-        "open_questions": (
-            _string_list(update.get("next_round_question_seeds"))
-            or _string_list(memory.get("next_round_question_seeds"))
-        )[:4],
-        "tensions": _string_list(current.get("unresolved_tensions"))[:4],
-        "stable_patterns": _string_list(current.get("repeated_themes"))[:4],
-        "incomplete_or_weak_patterns": _string_list(current.get("minority_inspiring_views"))[:4],
-        "recurring_patterns_across_rounds": _string_list(current.get("repeated_themes"))[:4],
-        "emerging_or_fading_signals": _string_list(current.get("minority_inspiring_views"))[:4],
-        "unresolved_tensions_over_time": _string_list(current.get("unresolved_tensions"))[:4],
-        "round_pattern_delta": _limit_visible_text(_formatmemory_summary(current), 180),
-        "next_round_question_seeds": (
-            _string_list(update.get("next_round_question_seeds"))
-            or _string_list(memory.get("next_round_question_seeds"))
-        )[:4],
         "recent_rounds": recent_rounds,
     }
 
@@ -1082,10 +988,14 @@ def _speaker_memory_snapshot(
 ) -> dict[str, Any]:
     packet = dict(carry_over_packet or {})
     agent_memory = packet.get("agent_generated_memory")
+    insight = ""
+    if isinstance(agent_memory, dict):
+        insight = str(agent_memory.get("personal_insight") or "").strip()
+    elif isinstance(agent_memory, str):
+        insight = agent_memory.strip()
     return {
         "kind": "speaking_agent",
-        "bridge_intent": _limit_visible_text(_bridge_intent_from_memory(agent_memory) or "No migration memory yet.", 180),
-        "agent_generated_memory": _compact_memory_value(agent_memory),
+        "personal_insight": insight or "暂无迁移记忆。",
     }
 
 
@@ -1123,65 +1033,9 @@ def _format_host_record_display(memory_update: dict[str, Any], fallback: str) ->
         if display:
             return emphasize_design_opportunities(display)
 
-    sections: list[str] = []
-    key_insights = _natural_list(memory_update.get("key_insights"))
-    if key_insights:
-        sections.append("## Insight Keywords\n" + _markdown_items(key_insights))
-
-    stable_patterns = _natural_list(memory_update.get("stable_patterns"))
-    if stable_patterns:
-        sections.append("## Settled For Now\n" + _markdown_items(stable_patterns))
-
-    weak_patterns = _natural_list(memory_update.get("incomplete_or_weak_patterns"))
-    if weak_patterns:
-        sections.append("## Still Underdeveloped\n" + _markdown_items(weak_patterns))
-
-    contested_points = _natural_list(memory_update.get("contested_points"))
-    if contested_points:
-        sections.append("## Contested Views\n" + _markdown_items(contested_points))
-
-    tensions = _natural_list(memory_update.get("tensions"))
-    if tensions:
-        sections.append("## Tension Keywords\n" + _markdown_items(tensions))
-
-    blind_spots = _natural_list(memory_update.get("blind_spots_or_ambiguities"))
-    if blind_spots:
-        sections.append("## Blind Spots / Ambiguities\n" + _markdown_items(blind_spots))
-
-    cumulative_evolution = _natural_text(memory_update.get("cumulative_pattern_evolution"))
-    if cumulative_evolution:
-        sections.append("## Cross-round Evolution\n" + cumulative_evolution)
-
-    recurring_patterns = _natural_list(memory_update.get("recurring_patterns_across_rounds"))
-    if recurring_patterns:
-        sections.append("## Cross-round Recurring Patterns\n" + _markdown_items(recurring_patterns))
-
-    emerging_signals = _natural_list(memory_update.get("emerging_or_fading_signals"))
-    if emerging_signals:
-        sections.append("## Emerging Or Fading Signals\n" + _markdown_items(emerging_signals))
-
-    unresolved_over_time = _natural_list(memory_update.get("unresolved_tensions_over_time"))
-    if unresolved_over_time:
-        sections.append("## Persistent Unresolved Tensions\n" + _markdown_items(unresolved_over_time))
-
-    pattern_delta = _natural_text(memory_update.get("round_pattern_delta"))
-    if pattern_delta:
-        sections.append("## This Round's Shift\n" + pattern_delta)
-
-    open_questions = _natural_list(memory_update.get("open_questions"))
-    if open_questions:
-        sections.append("## Unfinished Questions\n" + _markdown_items(open_questions))
-
-    synthesis = _natural_text(memory_update.get("synthesis"))
-    if not synthesis:
-        synthesis = _natural_text(extract_section(fallback, "synthesis"))
-    if not sections and not synthesis and not _looks_structured(fallback):
-        synthesis = _natural_text(fallback)
-    if not sections and synthesis:
-        sections.append(synthesis)
-
-    display = "\n\n".join(sections).strip() or "The host updated this table's memory. This round is stored as an internal structured record, and the next round will continue probing these cues."
-    return emphasize_design_opportunities(display)
+    if not _looks_structured(fallback):
+        return emphasize_design_opportunities(_natural_text(fallback) or "桌长已更新本桌记忆。")
+    return "桌长已更新本桌记忆：本轮讨论先保留为内部结构化记录，下一轮将继续围绕这些线索追问。"
 
 
 def _format_host_closing_display(content: str, memory_update: dict[str, Any], fallback: str) -> str:
@@ -1267,21 +1121,9 @@ def _empty_table_memory(table_id: str, question: str, host_id: str) -> TableMemo
         "table_id": table_id,
         "question": question,
         "host_id": host_id,
-        "living_summary": "",
-        "key_insights": [],
-        "open_questions": [],
-        "tensions": [],
-        "stable_patterns": [],
-        "incomplete_or_weak_patterns": [],
-        "contested_points": [],
-        "blind_spots_or_ambiguities": [],
-        "formatmemory": [],
-        "rounds": [],
         "tablememory_usage_description": TABLEMEMORY_USAGE_DESCRIPTION,
-        "cumulative_pattern_evolution": "",
-        "recurring_patterns_across_rounds": [],
-        "emerging_or_fading_signals": [],
-        "unresolved_tensions_over_time": [],
+        "formatmemory": [],
+        "next_round_question_seeds": [],
     }
 
 
@@ -1375,21 +1217,14 @@ def _normalize_formatmemory_record(
         "repeated_themes": _string_list(
             source.get("repeated_themes")
             or source.get("table_question_recurring_themes")
-            or source.get("stable_patterns")
-            or source.get("recurring_patterns_across_rounds")
-            or source.get("key_insights")
         ),
         "minority_inspiring_views": _string_list(
             source.get("minority_inspiring_views")
             or source.get("minority_views")
             or source.get("minority_but_inspiring_views")
-            or source.get("incomplete_or_weak_patterns")
-            or source.get("emerging_or_fading_signals")
         ),
         "unresolved_tensions": _string_list(
             source.get("unresolved_tensions")
-            or source.get("unresolved_tensions_over_time")
-            or source.get("tensions")
         ),
     }
 
@@ -1429,11 +1264,6 @@ def _parse_host_memory_update(content: str) -> dict[str, Any]:
         data = {}
     if data:
         record = _normalize_formatmemory_record(data.get("formatmemory") or data)
-        synthesis = str(data.get("synthesis") or _formatmemory_summary(record) or "")
-        key_insights = unique_append(
-            _string_list(record.get("repeated_themes")),
-            _string_list(record.get("minority_inspiring_views")),
-        )
         next_round_question_seeds = _string_list(data.get("next_round_question_seeds") or data.get("open_questions"))
         tablememory_usage_description = str(
             data.get("tablememory_usage_description")
@@ -1441,22 +1271,9 @@ def _parse_host_memory_update(content: str) -> dict[str, Any]:
             or TABLEMEMORY_USAGE_DESCRIPTION
         )
         return {
-            "synthesis": synthesis,
+            "synthesis": _formatmemory_summary(record),
             "tablememory_usage_description": tablememory_usage_description,
             "formatmemory": record,
-            "key_insights": key_insights,
-            "stable_patterns": _string_list(record.get("repeated_themes")),
-            "incomplete_or_weak_patterns": _string_list(record.get("minority_inspiring_views")),
-            "contested_points": [],
-            "open_questions": next_round_question_seeds,
-            "tensions": _string_list(record.get("unresolved_tensions")),
-            "blind_spots_or_ambiguities": [],
-            "source_context_anchor": _string_list(data.get("source_context_anchor")),
-            "cumulative_pattern_evolution": synthesis,
-            "recurring_patterns_across_rounds": _string_list(record.get("repeated_themes")),
-            "emerging_or_fading_signals": _string_list(record.get("minority_inspiring_views")),
-            "unresolved_tensions_over_time": _string_list(record.get("unresolved_tensions")),
-            "round_pattern_delta": synthesis,
             "next_round_question_seeds": next_round_question_seeds,
         }
     synthesis = extract_section(content, "synthesis") or content
@@ -1474,19 +1291,6 @@ def _parse_host_memory_update(content: str) -> dict[str, Any]:
         "synthesis": _formatmemory_summary(record) or synthesis,
         "tablememory_usage_description": TABLEMEMORY_USAGE_DESCRIPTION,
         "formatmemory": record,
-        "key_insights": key_insights,
-        "stable_patterns": key_insights,
-        "incomplete_or_weak_patterns": [],
-        "contested_points": [],
-        "open_questions": open_questions,
-        "tensions": tensions,
-        "blind_spots_or_ambiguities": open_questions,
-        "source_context_anchor": [],
-        "cumulative_pattern_evolution": _formatmemory_summary(record) or synthesis,
-        "recurring_patterns_across_rounds": key_insights,
-        "emerging_or_fading_signals": [],
-        "unresolved_tensions_over_time": tensions,
-        "round_pattern_delta": _formatmemory_summary(record) or synthesis,
         "next_round_question_seeds": open_questions[:3],
     }
 

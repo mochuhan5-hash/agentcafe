@@ -35,6 +35,7 @@ const newOrderBtn = document.querySelector("#newOrderBtn");
 const appShell = document.querySelector(".app-shell");
 
 let facilitatedTables = [];
+let lastExpertMeta = {};
 let activeRun = null;
 let eventSource = null;
 let traceTotal = 0;
@@ -119,7 +120,7 @@ tableCountInput.addEventListener("change", async () => {
 speakersInput.addEventListener("change", async () => {
   await loadAgentsForSettings();
   if (facilitatedTables.length) {
-    renderQuestionEditor(facilitatedTables);
+    renderQuestionEditor(facilitatedTables, lastExpertMeta);
   }
 });
 
@@ -129,8 +130,9 @@ backgroundFileInput.addEventListener("change", async () => {
     clearBackground();
     return;
   }
-  if (!isSupportedBriefFile(file)) {
-    addMessage("error", "Please upload a common text brief format, such as md, txt, csv, json, yaml, xml, html, rtf, or log.");
+  const lowerName = file.name.toLowerCase();
+  if (!lowerName.endsWith(".md") && !lowerName.endsWith(".markdown") && !lowerName.endsWith(".txt")) {
+    addMessage("error", "请上传 .md 或 .markdown 背景材料。");
     clearBackground();
     return;
   }
@@ -140,64 +142,34 @@ backgroundFileInput.addEventListener("change", async () => {
   clearBackgroundBtn.hidden = false;
 });
 
-const supportedBriefExtensions = new Set([
-  ".md",
-  ".markdown",
-  ".txt",
-  ".text",
-  ".csv",
-  ".tsv",
-  ".json",
-  ".jsonl",
-  ".yaml",
-  ".yml",
-  ".xml",
-  ".html",
-  ".htm",
-  ".rtf",
-  ".log",
-]);
-
-function isSupportedBriefFile(file) {
-  const lowerName = String(file?.name || "").toLowerCase();
-  const dotIndex = lowerName.lastIndexOf(".");
-  const extension = dotIndex >= 0 ? lowerName.slice(dotIndex) : "";
-  const mime = String(file?.type || "").toLowerCase();
-  return (
-    supportedBriefExtensions.has(extension) ||
-    mime.startsWith("text/") ||
-    ["application/json", "application/xml", "application/rtf"].includes(mime)
-  );
-}
-
 chooseBackgroundBtn?.addEventListener("click", () => backgroundFileInput.click());
 clearBackgroundBtn.addEventListener("click", clearBackground);
 pauseBtn.addEventListener("click", togglePause);
 addNoteBtn.addEventListener("mousedown", (event) => event.preventDefault());
 addNoteBtn.addEventListener("click", addSelectedNote);
 continueNotesBtn?.addEventListener("click", submitActiveNoteCheckpoint);
-downloadActivityLogBtn.addEventListener("click", downloadActivityLog);
-document.querySelectorAll(".opportunity-grid textarea").forEach((textarea, index) => {
+downloadActivityLogBtn?.addEventListener("click", downloadActivityLog);
+document.querySelectorAll("[data-final-insight]").forEach((textarea) => {
   textarea.addEventListener("change", () => {
     recordUserAction("final_insights_updated", {
-      insight_index: index + 1,
+      field: textarea.dataset.finalInsight,
       content: textarea.value.trim(),
       final_insights: getFinalInsightContents(),
     });
   });
 });
 
+// Delegate clicks on agent elements to show details modal
 document.addEventListener("click", (event) => {
   const button = event.target.closest("button");
   if (!button) return;
   recordUserAction("button_clicked", {
-    button_id: button.id || "",
-    button_text: getButtonLabel(button),
-    disabled: button.disabled,
+    id: button.id || "",
+    label: getButtonLabel(button),
+    tab: button.dataset.tab || "",
   });
 });
 
-// Delegate clicks on agent elements to show details modal
 document.addEventListener("click", (event) => {
   const avatarBtn = event.target.closest("[data-avatar-agent-id]");
   const metaStrong = event.target.closest("[data-meta-agent-id]");
@@ -281,7 +253,7 @@ function closeAgentProfile() {
 
 document.addEventListener("selectionchange", () => {
   pendingNoteSelection = getSelectedDiscussionSelection();
-  addNoteBtn.disabled = !canAddNoteFromSelection(pendingNoteSelection);
+  addNoteBtn.disabled = !isNoteTakingActive() || !pendingNoteSelection;
 });
 
 async function init() {
@@ -289,8 +261,8 @@ async function init() {
     const config = await getJson("/api/config");
     const tokenLabel = config.token_count ? ` · ${config.token_count} tokens` : "";
     modelBadge.textContent = `${config.model} · ${config.base_url}${tokenLabel}`;
-    tableCountInput.value = config.default_table_count || 4;
-    speakersInput.value = config.default_speakers_per_table || 3;
+    tableCountInput.value = config.default_table_count || 3;
+    speakersInput.value = config.default_speakers_per_table || 2;
     speechesInput.value = config.default_speeches_per_agent || 3;
     speechesPerAgent = getSpeechesPerAgent();
     if (!config.token_configured) {
@@ -327,6 +299,10 @@ requestForm.addEventListener("submit", async (event) => {
       background_filename: backgroundFilename,
     });
     facilitatedTables = result.tables;
+    console.log("[facilitate] full result:", JSON.stringify(result, null, 2));
+    const expertSkill = result.tables?.[0]?.expert_skill || "";
+    const expertRationale = result.expert_skill_routes?.rationale || result.tables?.[0]?.expert_rationale || "";
+    lastExpertMeta = { expertSkill, expertRationale };
     updateAgentStatus("facilitator", {
       status: "Questions Ready",
       detail: "A guiding discussion question has been generated for each table.",
@@ -334,7 +310,7 @@ requestForm.addEventListener("submit", async (event) => {
     });
     addMessage("facilitator", formatQuestions(facilitatedTables));
     await loadAgentsForSettings();
-    renderQuestionEditor(facilitatedTables);
+    renderQuestionEditor(facilitatedTables, { expertSkill, expertRationale });
     startBtn.disabled = false;
   } catch (error) {
     updateAgentStatus("facilitator", {
@@ -659,9 +635,18 @@ function hideQuestionEditorView() {
   discussionPane.classList.remove("show-editor");
 }
 
-function renderQuestionEditor(tables) {
+function renderQuestionEditor(tables, { expertSkill, expertRationale } = {}) {
   showQuestionEditorView();
   questionEditor.innerHTML = "";
+  console.log("[renderQuestionEditor] expertSkill:", expertSkill, "expertRationale:", expertRationale);
+  if (expertSkill && expertSkill !== "mixed") {
+    const skillNames = { louyongqi: "娄永琪", wangmeng: "王萌", wangshouzhi: "王受之", liulong: "刘胧" };
+    const displayName = skillNames[expertSkill] || expertSkill;
+    const banner = document.createElement("div");
+    banner.className = "skill-banner";
+    banner.innerHTML = `<span class="skill-label">Expert Skill:</span> <strong>${escapeHtml(displayName)}</strong>${expertRationale && !expertRationale.includes("未提供") ? ` <span class="skill-rationale">— ${escapeHtml(expertRationale)}</span>` : ""}`;
+    questionEditor.append(banner);
+  }
   buildDefaultAssignments(tables);
   tables.forEach((table) => {
     questionEditor.append(renderLeftField(table));
@@ -908,7 +893,6 @@ function renderTables(run) {
     `;
     tablesGrid.append(table);
     
-    // Draw initial seating chart
     const initialAgents = [hostId, ...(run.assignments[tableId] || [])];
     currentTableAgents[tableId] = initialAgents;
     drawSeatingChart(table, tableId, initialAgents);
@@ -1000,21 +984,10 @@ function ensureRound(tableId, roundIndex, agentIds = []) {
   let round = list.querySelector(`[data-round-index="${roundIndex}"]`);
   if (round) return round;
 
-  const displayRound = Number(roundIndex) + 1;
-  const tableQuestion = table.dataset.tableQuestion || "";
   round = document.createElement("div");
   round.className = "round-block";
   round.dataset.roundIndex = roundIndex;
   round.innerHTML = `
-    <div class="round-heading">
-      <div class="round-question">
-        <span>${escapeHtml(tableQuestion)}</span>
-      </div>
-      <div class="round-meta">
-        <span>Round ${displayRound}</span>
-        <span>${formatRoundMeta(agentIds)}</span>
-      </div>
-    </div>
     <div data-host-opening></div>
     <div data-contributions></div>
     <div data-host-record></div>
@@ -1024,6 +997,7 @@ function ensureRound(tableId, roundIndex, agentIds = []) {
 }
 
 function appendHostOpening(metadata) {
+  const shouldScroll = shouldFollowTableScrollByTable(metadata.table_id);
   const round = ensureRound(metadata.table_id, metadata.round_index, metadata.agent_ids || []);
   if (!round) return;
   if (metadata.memory_snapshot) agentMemorySnapshots[metadata.host_id] = metadata.memory_snapshot;
@@ -1039,7 +1013,8 @@ function appendHostOpening(metadata) {
     memorySnapshot: metadata.memory_snapshot,
     tone: "host",
   });
-  scrollTableToBottom(round);
+  decorateHostNoteTarget(slot.querySelector(".host-opening"), metadata, "host_opening");
+  scrollTableToBottom(round, shouldScroll);
   
   // Highlight host seat on map
   const agents = currentTableAgents[metadata.table_id] || (metadata.agent_ids || [metadata.host_id]);
@@ -1047,6 +1022,7 @@ function appendHostOpening(metadata) {
 }
 
 function appendContribution(metadata) {
+  const shouldScroll = shouldFollowTableScrollByTable(metadata.table_id);
   const round = ensureRound(metadata.table_id, metadata.round_index, []);
   if (!round) return;
   if (metadata.memory_snapshot) agentMemorySnapshots[metadata.agent_id] = metadata.memory_snapshot;
@@ -1087,7 +1063,7 @@ function appendContribution(metadata) {
     })}
   `;
   list.append(speech);
-  scrollTableToBottom(round);
+  scrollTableToBottom(round, shouldScroll);
   
   // Highlight active speaker seat on map
   const agents = currentTableAgents[metadata.table_id] || [metadata.agent_id];
@@ -1095,6 +1071,7 @@ function appendContribution(metadata) {
 }
 
 function appendHostRecord(metadata) {
+  const shouldScroll = shouldFollowTableScrollByTable(metadata.table_id);
   const round = ensureRound(metadata.table_id, metadata.round_index, []);
   if (!round) return;
   if (metadata.memory_snapshot) agentMemorySnapshots[metadata.host_id] = metadata.memory_snapshot;
@@ -1111,7 +1088,8 @@ function appendHostRecord(metadata) {
       tone: "host",
     })}
   `;
-  scrollTableToBottom(round);
+  decorateHostNoteTarget(slot.querySelector(".host-record"), metadata, "host_record");
+  scrollTableToBottom(round, shouldScroll);
   
   // Highlight host seat on map
   const agents = currentTableAgents[metadata.table_id] || [metadata.host_id];
@@ -1122,6 +1100,18 @@ function tableHostLabel(tableId) {
   const match = String(tableId || "").match(/(\d+)$/);
   const number = match ? String(Number(match[1])) : String(tableId || "?");
   return `tb${number}`;
+}
+
+function decorateHostNoteTarget(element, metadata, kind) {
+  if (!element) return;
+  const tableId = metadata.table_id || "";
+  const roundIndex = metadata.round_index ?? "";
+  const hostId = metadata.host_id || "";
+  element.id = `speech-${tableId}-${roundIndex}-${hostId}-${kind}`;
+  element.dataset.speakerName = tableHostLabel(tableId);
+  element.dataset.speakerId = hostId;
+  element.dataset.tableId = tableId;
+  element.dataset.roundIndex = roundIndex;
 }
 
 function renderAgentMessage({
@@ -1224,32 +1214,14 @@ function renderSeatMemoryCard(agentName, roleTag, snapshot) {
   const rows = formatMemorySnapshot(snapshot);
   const sections = [];
   if (snapshot && snapshot.kind === "table_host") {
-    if (snapshot.tablememory_usage_description) {
-      sections.push(`<div class="smc-section smc-usage"><div class="smc-section-body">${escapeHtml(snapshot.tablememory_usage_description)}</div></div>`);
-    }
-    if (snapshot.living_summary) {
-      sections.push(`<div class="smc-section"><div class="smc-section-title">Table Memory</div><div class="smc-section-body">${escapeHtml(snapshot.living_summary)}</div></div>`);
-    }
     const rounds = (snapshot.recent_rounds || [])
       .filter((round) => round && typeof round === "object")
       .map(renderSeatMemoryRound)
       .join("");
     if (rounds) sections.push(rounds);
-    if (Array.isArray(snapshot.next_round_question_seeds) && snapshot.next_round_question_seeds.length) {
-      sections.push(`<div class="smc-section"><div class="smc-section-title">Next-round Question Seeds</div><ul class="smc-list">${snapshot.next_round_question_seeds.map((s) => `<li>${escapeHtml(s)}</li>`).join("")}</ul></div>`);
-    }
   } else if (snapshot) {
-    if (snapshot.bridge_intent) {
-      sections.push(`<div class="smc-section"><div class="smc-section-title">Bridge Intent</div><div class="smc-section-body">${escapeHtml(snapshot.bridge_intent)}</div></div>`);
-    }
-    if (snapshot.agent_generated_memory) {
-      const mem = snapshot.agent_generated_memory;
-      if (typeof mem === "string" && mem.trim()) {
-        sections.push(`<div class="smc-section"><div class="smc-section-title">Personal Memory</div><div class="smc-section-body">${escapeHtml(mem)}</div></div>`);
-      } else if (typeof mem === "object" && !Array.isArray(mem)) {
-        const items = Object.entries(mem).filter(([, v]) => v !== null && v !== "").map(([k, v]) => `<li><strong>${escapeHtml(k)}</strong>: ${escapeHtml(String(v))}</li>`).join("");
-        if (items) sections.push(`<div class="smc-section"><div class="smc-section-title">Personal Memory</div><ul class="smc-list">${items}</ul></div>`);
-      }
+    if (snapshot.personal_insight && snapshot.personal_insight !== "暂无迁移记忆。") {
+      sections.push(`<div class="smc-section"><div class="smc-section-title">🧠 personal_insight</div><div class="smc-section-body">${escapeHtml(snapshot.personal_insight)}</div></div>`);
     }
   }
   const body = sections.length
@@ -1295,24 +1267,16 @@ function formatMemorySnapshot(snapshot) {
   if (!snapshot || typeof snapshot !== "object") return [];
   const rows = [];
   if (snapshot.kind === "table_host") {
-    rows.push(`Current table memory: ${snapshot.living_summary || "None yet"}`);
-    addListRows(rows, "Retained insights", snapshot.key_insights);
-    addListRows(rows, "Open questions", snapshot.open_questions);
-    addListRows(rows, "Tensions", snapshot.tensions);
-    if (snapshot.cumulative_pattern_evolution) rows.push(`Cumulative evolution: ${snapshot.cumulative_pattern_evolution}`);
-    addListRows(rows, "Cross-round recurring patterns", snapshot.recurring_patterns_across_rounds);
-    addListRows(rows, "Emerging or fading signals", snapshot.emerging_or_fading_signals);
-    addListRows(rows, "Persistent unresolved tensions", snapshot.unresolved_tensions_over_time);
-    if (snapshot.round_pattern_delta) rows.push(`This round's shift within the accumulated history: ${snapshot.round_pattern_delta}`);
-    addListRows(rows, "Next-round question seeds", snapshot.next_round_question_seeds);
     (snapshot.recent_rounds || []).forEach((round) => {
-      if (round.synthesis) rows.push(`Round ${round.round} synthesis: ${round.synthesis}`);
-      if (round.cumulative_pattern_evolution) rows.push(`Round ${round.round} evolution: ${round.cumulative_pattern_evolution}`);
+      addListRows(rows, `第 ${round.round} 轮重复主题`, round.repeated_themes);
+      addListRows(rows, `第 ${round.round} 轮少数启发`, round.minority_inspiring_views);
+      addListRows(rows, `第 ${round.round} 轮未解张力`, round.unresolved_tensions);
     });
     return rows;
   }
-  if (snapshot.bridge_intent) rows.push(`Bridge intent: ${snapshot.bridge_intent}`);
-  addObjectRows(rows, "Personal migration memory", snapshot.agent_generated_memory);
+  if (snapshot.personal_insight && snapshot.personal_insight !== "暂无迁移记忆。") {
+    rows.push(`personal_insight: ${snapshot.personal_insight}`);
+  }
   return rows;
 }
 
@@ -1374,20 +1338,26 @@ function appendRotationRecord(metadata) {
   });
 }
 
-function scrollTableToBottom(round) {
+function isNearBottom(el, threshold = 60) {
+  return el.scrollHeight - el.scrollTop - el.clientHeight <= threshold;
+}
+
+function shouldFollowTableScrollByTable(tableId) {
+  const table = tablesGrid.querySelector(`[data-table-id="${tableId}"]`);
+  const list = table?.querySelector("[data-round-list]");
+  return !list || isNearBottom(list);
+}
+
+function scrollTableToBottom(round, shouldScroll = true) {
   const list = round.closest(".round-list");
-  if (!list) return;
+  if (!list || !shouldScroll) return;
   list.scrollTop = list.scrollHeight;
 }
 
 function renderHarvest(markdown) {
   harvestContent.classList.remove("muted");
-  harvestContent.dataset.sourceType = "harvest";
-  harvestContent.dataset.tableId = "harvest";
-  harvestContent.dataset.roundIndex = Number.isFinite(Number(maxRounds)) ? String(maxRounds) : "";
-  harvestContent.dataset.speakerName = "Global Harvest";
-  harvestContent.dataset.speakerId = "harvest";
   harvestContent.innerHTML = renderMarkdownLite(markdown || "No harvest generated.");
+  expandBottomPanel("harvest");
 }
 
 function resetRunView() {
@@ -1414,12 +1384,7 @@ function resetRunView() {
   document.querySelectorAll(".table-card").forEach(card => card.classList.remove("gated-pulse"));
   traceCount.textContent = "0 events";
   harvestContent.classList.add("muted");
-  harvestContent.removeAttribute("data-source-type");
-  harvestContent.removeAttribute("data-table-id");
-  harvestContent.removeAttribute("data-round-index");
-  harvestContent.removeAttribute("data-speaker-name");
-  harvestContent.removeAttribute("data-speaker-id");
-  harvestContent.textContent = "Waiting for the discussion to finish";
+  harvestContent.textContent = "等待讨论完成";
   tablesGrid.innerHTML = "";
   resetAgentRoleStatuses();
   renderNotebook();
@@ -1502,11 +1467,11 @@ function getAgentName(agentId) {
 }
 
 function getTableCount() {
-  return clampNumber(tableCountInput.value, 1, 8, 4);
+  return clampNumber(tableCountInput.value, 1, 8, 3);
 }
 
 function getSpeakersPerTable() {
-  return clampNumber(speakersInput.value, 1, 8, 3);
+  return clampNumber(speakersInput.value, 1, 8, 2);
 }
 
 function getRoundCount() {
@@ -1551,8 +1516,9 @@ function isNoteTakingActive() {
 function refreshNoteTakingControls() {
   discussionPane.classList.toggle("paused", isNoteTakingActive());
   pauseBtn.disabled = !activeRun || Boolean(activeNoteCheckpoint);
-  pauseBtn.textContent = isPaused ? "Resume Discussion" : "Pause to Annotate";
-  addNoteBtn.disabled = !canAddNoteFromSelection(pendingNoteSelection);
+  pauseBtn.textContent = isPaused ? "继续讨论" : "暂停标注";
+  addNoteBtn.disabled = !isNoteTakingActive() || !pendingNoteSelection;
+  if (isNoteTakingActive()) expandBottomPanel("notebook");
   if (activeNoteCheckpoint) {
     renderActiveNoteCheckpoint();
   }
@@ -1609,7 +1575,8 @@ function enqueueNoteCheckpoint(checkpoint) {
 function activateNoteCheckpoint(checkpoint) {
   activeNoteCheckpoint = checkpoint;
   noteCheckpointPanel.hidden = false;
-  setStatus(`Rotation Pending · ${checkpoint.table_id} R${Number(checkpoint.round_index) + 1}`, "running");
+  expandBottomPanel("notebook");
+  setStatus(`待换桌 · ${checkpoint.table_id} R${Number(checkpoint.round_index) + 1}`, "running");
   
   // Highlight active checkpoint table card
   document.querySelectorAll(".table-card").forEach(card => card.classList.remove("gated-pulse"));
@@ -1620,9 +1587,9 @@ function activateNoteCheckpoint(checkpoint) {
   }
 
   updateAgentStatus("host", {
-    status: "Waiting To Rotate",
-    detail: `${checkpoint.table_id} is paused. Finish this round's insight and opportunity notes; the host will generate memory after rotation.`,
-    meta: `Round ${Number(checkpoint.round_index) + 1}`,
+    status: "等待换桌",
+    detail: `${checkpoint.table_id} 已暂停：请完成本轮设计洞察/机会笔记，点击"换桌"后桌长才会生成本轮记忆。`,
+    meta: `第 ${Number(checkpoint.round_index) + 1} 轮`,
   });
   ensureRound(checkpoint.table_id, checkpoint.round_index, []);
   refreshNoteTakingControls();
@@ -1659,17 +1626,12 @@ function hideNoteCheckpointPanel() {
 function renderActiveNoteCheckpoint() {
   if (!activeNoteCheckpoint || !noteCheckpointPanel) return;
   const notes = getNotesForCheckpoint(activeNoteCheckpoint);
-  const stats = getNotebookStats(notes);
   const roundLabel = Number(activeNoteCheckpoint.round_index) + 1;
-  const queued = pendingNoteCheckpoints.length ? ` · ${pendingNoteCheckpoints.length} more tables waiting to rotate` : "";
   if (noteCheckpointTitle) {
-    noteCheckpointTitle.textContent = `${activeNoteCheckpoint.table_id} · Round ${roundLabel} · Pre-rotation Notes`;
-  }
-  if (noteCheckpointDetail) {
-    noteCheckpointDetail.textContent = `Finish this table's insight and opportunity notes for the round. After you rotate, the host will use them to generate internal memory and a closing note. ${stats.noteCount} notes / ${stats.highlightCount} highlights will be submitted${queued}.`;
+    noteCheckpointTitle.textContent = `${activeNoteCheckpoint.table_id} · R${roundLabel} · ${notes.length} 条笔记`;
   }
   if (continueNotesBtn) {
-    continueNotesBtn.textContent = notes.length ? `Submit ${stats.noteCount} Notes And Rotate` : "Rotate Without Notes";
+    continueNotesBtn.textContent = notes.length ? "提交并换桌" : "直接换桌";
   }
 }
 
@@ -1691,14 +1653,6 @@ async function submitActiveNoteCheckpoint() {
       status: "Generating Host Memory",
       detail: `${checkpoint.table_id}'s host is combining user-marked notes into internal memory before closing the round.`,
       meta: `${notes.length} notes · switch table`,
-    });
-    recordUserAction("notes_submitted", {
-      checkpoint_id: checkpoint.checkpoint_id,
-      table_id: checkpoint.table_id,
-      round_index: Number(checkpoint.round_index),
-      note_count: notes.length,
-      highlight_count: notes.reduce((count, note) => count + (Number(note.highlight_count) || 0), 0),
-      notes,
     });
     finishNoteCheckpoint(checkpoint.checkpoint_id);
   } catch (error) {
@@ -1726,7 +1680,6 @@ function noteToPayload(entry) {
     speaker_id: entry.speakerId,
     speech_id: entry.speechId,
     speech_target_id: entry.speechTargetId,
-    highlight_count: entry.highlightCount,
     created_at: entry.createdAt,
   };
 }
@@ -1741,14 +1694,12 @@ function getSelectedDiscussionSelection() {
   if (!selection || selection.isCollapsed || selection.rangeCount === 0) return null;
   const text = selection.toString().trim();
   if (!text) return null;
-  const anchorSource = getClosestNoteSource(selection.anchorNode);
-  const focusSource = getClosestNoteSource(selection.focusNode);
-  if (!anchorSource || anchorSource !== focusSource) return null;
+  const anchorSpeech = getClosestSpeech(selection.anchorNode);
+  const focusSpeech = getClosestSpeech(selection.focusNode);
+  if (!anchorSpeech || anchorSpeech !== focusSpeech) return null;
   return {
     text,
-    source: anchorSource,
-    speech: anchorSource,
-    sourceType: anchorSource.dataset.sourceType || "speech",
+    speech: anchorSpeech,
     range: selection.getRangeAt(0).cloneRange(),
   };
 }
@@ -1756,32 +1707,15 @@ function getSelectedDiscussionSelection() {
 function getClosestSpeech(node) {
   if (!node) return null;
   const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-  return element?.closest(".speech") || null;
-}
-
-function getClosestNoteSource(node) {
-  if (!node) return null;
-  const element = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
-  return element?.closest(".speech, #harvestContent") || null;
-}
-
-function canAddNoteFromSelection(selectionInfo) {
-  if (!selectionInfo) return false;
-  if (selectionInfo.sourceType === "harvest") return !harvestContent.classList.contains("muted");
-  return isNoteTakingActive();
+  return element?.closest(".speech, .host-opening, .host-record") || null;
 }
 
 function addSelectedNote() {
   const selectionInfo = getSelectedDiscussionSelection() || pendingNoteSelection;
-  if (!canAddNoteFromSelection(selectionInfo)) return;
-  const { text, source, sourceType, range } = selectionInfo;
-  const speech = source;
+  if (!selectionInfo) return;
+  const { text, speech, range } = selectionInfo;
   const noteId = `note-${++noteSequence}`;
   const highlighted = highlightSelectionRange(range, noteId);
-  if (!highlighted?.highlightCount) {
-    addMessage("error", "The selected text could not be highlighted. Please select it again before adding a note.");
-    return;
-  }
   const roundBlock = speech.closest("[data-round-index]");
   const tableCard = speech.closest("[data-table-id]");
   const tableId = speech.dataset.tableId || tableCard?.dataset.tableId || activeNoteCheckpoint?.table_id || "";
@@ -1789,34 +1723,20 @@ function addSelectedNote() {
   const roundIndex = Number.isFinite(Number(roundIndexValue))
     ? Number(roundIndexValue)
     : Number(activeNoteCheckpoint?.round_index);
-  notebookEntries = [
-    ...notebookEntries,
-    {
-      id: noteId,
-      text,
-      sourceType,
-      speakerName: speech.dataset.speakerName || (sourceType === "harvest" ? "Global Harvest" : "Unknown speaker"),
-      speakerId: speech.dataset.speakerId || "",
-      tableId,
-      roundIndex,
-      speechId: speech.id,
-      speechTargetId: highlighted.element?.id || speech.id,
-      highlightCount: highlighted.highlightCount,
-      round: Number.isFinite(roundIndex) ? roundIndex + 1 : currentRound,
-      createdAt: formatActivityTime(),
-    },
-  ];
-  recordUserAction("note_highlighted", {
-    note_id: noteId,
+  const noteEntry = {
+    id: noteId,
     text,
-    sourceType: sourceType || "speech",
-    table_id: tableId,
-    round_index: Number.isFinite(roundIndex) ? roundIndex : null,
-    speaker_name: speech.dataset.speakerName || (sourceType === "harvest" ? "Global Harvest" : "Unknown speaker"),
-    speaker_id: speech.dataset.speakerId || "",
-    speech_id: speech.id,
-    highlight_count: highlighted.highlightCount,
-  });
+    speakerName: speech.dataset.speakerName || "Unknown speaker",
+    speakerId: speech.dataset.speakerId || "",
+    tableId,
+    roundIndex,
+    speechId: speech.id,
+    speechTargetId: highlighted?.id || speech.id,
+    round: Number.isFinite(roundIndex) ? roundIndex + 1 : currentRound,
+    createdAt: new Date().toLocaleTimeString(),
+  };
+  notebookEntries = [...notebookEntries, noteEntry];
+  recordUserAction("note_added", noteToLogEntry(noteEntry));
   window.getSelection()?.removeAllRanges();
   pendingNoteSelection = null;
   renderNotebook();
@@ -1825,8 +1745,7 @@ function addSelectedNote() {
 }
 
 function renderNotebook() {
-  const stats = getNotebookStats();
-  notebookCount.textContent = `${stats.noteCount} notes · ${stats.highlightCount} highlights`;
+  notebookCount.textContent = `已记录 ${notebookEntries.length} 条笔记`;
   notebookList.innerHTML = "";
   notebookEntries.forEach((entry, index) => {
     const item = document.createElement("button");
@@ -1834,7 +1753,7 @@ function renderNotebook() {
     item.className = "notebook-entry";
     item.dataset.noteTarget = entry.id;
     item.innerHTML = `
-      <div class="notebook-entry-meta">#${index + 1} · ${escapeHtml(entry.tableId || "?")} · ${escapeHtml(entry.speakerName)} · Round ${entry.round || "?"} · ${entry.highlightCount || 0} highlights · ${escapeHtml(entry.createdAt)}</div>
+      <div class="notebook-entry-meta">#${index + 1} · ${escapeHtml(entry.tableId || "?")} · ${escapeHtml(entry.speakerName)} · Round ${entry.round || "?"} · ${escapeHtml(entry.createdAt)}</div>
       <p>${escapeHtml(entry.text)}</p>
     `;
     item.addEventListener("click", () => jumpToNote(entry));
@@ -1843,23 +1762,22 @@ function renderNotebook() {
 }
 
 function highlightSelectionRange(range, noteId) {
-  const noteSource = getClosestNoteSource(range.commonAncestorContainer);
-  if (!noteSource) return null;
+  const speech = getClosestSpeech(range.commonAncestorContainer);
+  if (!speech) return null;
   const simpleMark = document.createElement("mark");
   simpleMark.className = "user-note-highlight";
   simpleMark.dataset.noteId = noteId;
   try {
     simpleMark.append(range.extractContents());
     range.insertNode(simpleMark);
-    return { element: simpleMark, highlightCount: 1 };
+    return simpleMark;
   } catch {
     simpleMark.remove();
   }
 
   const textNodes = [];
-  const marks = [];
   const walker = document.createTreeWalker(
-    noteSource,
+    speech,
     NodeFilter.SHOW_TEXT,
     {
       acceptNode(node) {
@@ -1887,27 +1805,8 @@ function highlightSelectionRange(range, noteId) {
     mark.dataset.noteId = noteId;
     selected.parentNode.insertBefore(mark, after);
     mark.append(selected);
-    marks.push(mark);
   });
-  return marks.length ? { element: marks[0], highlightCount: marks.length } : null;
-}
-
-function getNotebookStats(entries = notebookEntries) {
-  return entries.reduce(
-    (stats, entry) => {
-      const storedCount = Number(entry.highlightCount) || 0;
-      const liveCount = countNoteHighlightElements(entry.id);
-      stats.noteCount += 1;
-      stats.highlightCount += Math.max(storedCount, liveCount);
-      return stats;
-    },
-    { noteCount: 0, highlightCount: 0 },
-  );
-}
-
-function countNoteHighlightElements(noteId) {
-  if (!noteId) return 0;
-  return document.querySelectorAll(`[data-note-id="${noteId}"]`).length;
+  return document.querySelector(`[data-note-id="${noteId}"]`);
 }
 
 function jumpToNote(entry) {
@@ -1936,101 +1835,9 @@ function addMessage(kind, content) {
   } else {
     message.textContent = content;
   }
+  const shouldScroll = isNearBottom(chatLog);
   chatLog.append(message);
-  chatLog.scrollTop = chatLog.scrollHeight;
-}
-
-function recordUserAction(type, details = {}) {
-  userActivityLog = [
-    ...userActivityLog,
-    {
-      type,
-      timestamp: new Date().toISOString(),
-      run_id: activeRun?.run_id || "",
-      current_round: getCurrentActivityRound(),
-      active_checkpoint: activeNoteCheckpoint
-        ? {
-            checkpoint_id: activeNoteCheckpoint.checkpoint_id,
-            table_id: activeNoteCheckpoint.table_id,
-            round_index: Number(activeNoteCheckpoint.round_index),
-          }
-        : null,
-      details,
-    },
-  ];
-}
-
-function getCurrentActivityRound() {
-  if (activeNoteCheckpoint) return Number(activeNoteCheckpoint.round_index) + 1;
-  return currentRound || 0;
-}
-
-function formatActivityTime() {
-  return new Date().toLocaleTimeString("en-US", { hour12: false });
-}
-
-function getButtonLabel(button) {
-  return (button.innerText || button.textContent || button.getAttribute("aria-label") || button.id || "")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function getFinalInsightContents() {
-  return [...document.querySelectorAll(".opportunity-grid label")].map((label, index) => ({
-    index: index + 1,
-    label: label.querySelector("span")?.textContent?.trim() || `Opportunity ${index + 1}`,
-    content: label.querySelector("textarea")?.value.trim() || "",
-  }));
-}
-
-function downloadActivityLog() {
-  recordUserAction("activity_log_downloaded", {
-    event_count_before_download: userActivityLog.length,
-  });
-  const payload = {
-    generated_at: new Date().toISOString(),
-    run: activeRun
-      ? {
-          run_id: activeRun.run_id,
-          status: activeRun.status,
-          table_count: activeRun.table_count,
-          rounds: activeRun.rounds,
-          speakers_per_table: activeRun.speakers_per_table,
-          speeches_per_agent: activeRun.speeches_per_agent,
-        }
-      : null,
-    notebook_stats: getNotebookStats(),
-    notes: notebookEntries.map(noteToLogEntry),
-    final_insights: getFinalInsightContents(),
-    activity_log: userActivityLog,
-  };
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  const runId = activeRun?.run_id || "no-run";
-  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  link.href = url;
-  link.download = `agent-cafe-user-log-${runId}-${stamp}.json`;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
-}
-
-function noteToLogEntry(entry) {
-  return {
-    id: entry.id,
-    text: entry.text,
-    table_id: entry.tableId,
-    round_index: Number(entry.roundIndex),
-    round: entry.round,
-    speaker_name: entry.speakerName,
-    speaker_id: entry.speakerId,
-    speech_id: entry.speechId,
-    speech_target_id: entry.speechTargetId,
-    highlight_count: entry.highlightCount,
-    created_at: entry.createdAt,
-  };
+  if (shouldScroll) chatLog.scrollTop = chatLog.scrollHeight;
 }
 
 function formatQuestions(tables) {
@@ -2061,6 +1868,169 @@ async function readJsonResponse(response) {
     throw new Error(data.detail || `Request failed: ${response.status}`);
   }
   return data;
+}
+
+
+function recordUserAction(type, details = {}) {
+  userActivityLog = [
+    ...userActivityLog,
+    {
+      type,
+      timestamp: new Date().toISOString(),
+      run_id: activeRun?.run_id || "",
+      current_round: currentRound,
+      active_checkpoint: activeNoteCheckpoint
+        ? {
+            checkpoint_id: activeNoteCheckpoint.checkpoint_id,
+            table_id: activeNoteCheckpoint.table_id,
+            round_index: activeNoteCheckpoint.round_index,
+          }
+        : null,
+      details,
+    },
+  ];
+}
+
+function getButtonLabel(button) {
+  return (button.innerText || button.textContent || button.getAttribute("aria-label") || button.id || "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getFinalInsightContents() {
+  return [...document.querySelectorAll("[data-final-insight]")].map((textarea) => ({
+    key: textarea.dataset.finalInsight || "",
+    label: textarea.closest("label")?.querySelector("span")?.textContent?.trim() || textarea.dataset.finalInsight || "",
+    content: textarea.value.trim(),
+  }));
+}
+
+function getUserFinalSubmission() {
+  const fields = getFinalInsightContents();
+  return {
+    submitted_at: new Date().toISOString(),
+    fields,
+    text: fields
+      .filter((field) => field.content)
+      .map((field) => `${field.label || field.key}: ${field.content}`)
+      .join("\n\n"),
+  };
+}
+
+function getGlobalHarvestExport() {
+  return {
+    markdown: harvestContent?.innerHTML || "",
+    text: harvestContent?.innerText?.trim() || "",
+  };
+}
+
+function getNotebookStats() {
+  const byTable = {};
+  const byRound = {};
+  notebookEntries.forEach((entry) => {
+    const tableKey = entry.tableId || "unknown";
+    const roundKey = Number.isFinite(Number(entry.roundIndex)) ? String(Number(entry.roundIndex) + 1) : "unknown";
+    byTable[tableKey] = (byTable[tableKey] || 0) + 1;
+    byRound[roundKey] = (byRound[roundKey] || 0) + 1;
+  });
+  return {
+    total: notebookEntries.length,
+    by_table: byTable,
+    by_round: byRound,
+  };
+}
+
+function getRunLogSummary() {
+  if (!activeRun) return null;
+  return {
+    run_id: activeRun.run_id || "",
+    status: activeRun.status || runStatus.textContent || "",
+    table_count: activeRun.table_count || Object.keys(activeRun.table_questions || {}).length || getTableCount(),
+    rounds: activeRun.rounds || maxRounds || getRoundCount(),
+    speakers_per_table: activeRun.speakers_per_table || getSpeakersPerTable(),
+    speeches_per_agent: activeRun.speeches_per_agent || speechesPerAgent || getSpeechesPerAgent(),
+  };
+}
+
+function noteToLogEntry(entry) {
+  return {
+    id: entry.id,
+    text: entry.text,
+    table_id: entry.tableId,
+    round_index: Number(entry.roundIndex),
+    round: entry.round,
+    speaker_name: entry.speakerName,
+    speaker_id: entry.speakerId,
+    speech_id: entry.speechId,
+    speech_target_id: entry.speechTargetId,
+    created_at: entry.createdAt,
+  };
+}
+
+function getTableChatHistories() {
+  return [...tablesGrid.querySelectorAll(".table-card")].map((table) => {
+    const tableId = table.dataset.tableId || "";
+    const records = [...table.querySelectorAll(".host-opening, .speech, .host-record")].map((item) => {
+      const meta = item.querySelector(".message-meta");
+      return {
+        id: item.id || "",
+        table_id: item.dataset.tableId || tableId,
+        round_index: Number.isFinite(Number(item.dataset.roundIndex)) ? Number(item.dataset.roundIndex) : null,
+        round: Number.isFinite(Number(item.dataset.roundIndex)) ? Number(item.dataset.roundIndex) + 1 : null,
+        speaker_name: item.dataset.speakerName || meta?.querySelector("strong")?.textContent?.trim() || "",
+        speaker_id: item.dataset.speakerId || "",
+        role_label: meta?.querySelector("span")?.textContent?.trim() || "",
+        meta_label: meta?.querySelector("em")?.textContent?.trim() || "",
+        content: item.querySelector(".markdown-lite")?.innerText?.trim() || "",
+        kind: item.classList.contains("host-opening")
+          ? "host_opening"
+          : item.classList.contains("host-record")
+            ? "host_record"
+            : "agent_contribution",
+      };
+    });
+    return {
+      table_id: tableId,
+      table_question: table.dataset.tableQuestion || "",
+      history: records,
+    };
+  });
+}
+
+function downloadActivityLog() {
+  const userNotes = notebookEntries.map(noteToLogEntry);
+  const finalSubmission = getUserFinalSubmission();
+  const globalHarvest = getGlobalHarvestExport();
+  recordUserAction("activity_log_downloaded", {
+    event_count_before_download: userActivityLog.length,
+    user_note_count: userNotes.length,
+    table_history_count: getTableChatHistories().reduce((total, table) => total + table.history.length, 0),
+    final_submission_fields: finalSubmission.fields.length,
+    global_harvest_chars: globalHarvest.text.length,
+  });
+  const payload = {
+    generated_at: new Date().toISOString(),
+    run: getRunLogSummary(),
+    notebook_stats: getNotebookStats(),
+    user_notes: userNotes,
+    notes: userNotes,
+    table_chat_histories: getTableChatHistories(),
+    global_harvest: globalHarvest,
+    user_final_submission: finalSubmission,
+    final_insights: finalSubmission.fields,
+    activity_log: userActivityLog,
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  const runId = activeRun?.run_id || "no-run";
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  link.href = url;
+  link.download = `agent-cafe-user-log-${runId}-${stamp}.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function renderMarkdownLite(markdown) {
@@ -2168,4 +2138,47 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+/* ── Bottom Panel Tab Logic ── */
+const bottomPanel = document.querySelector("#bottomPanel");
+const bottomPanelToggle = document.querySelector("#bottomPanelToggle");
+
+if (bottomPanel && bottomPanelToggle) {
+  bottomPanel.addEventListener("click", (e) => {
+    const tab = e.target.closest(".bottom-tab");
+    if (tab) {
+      bottomPanel.querySelectorAll(".bottom-tab").forEach(t => t.classList.remove("active"));
+      tab.classList.add("active");
+      const key = tab.dataset.tab;
+      bottomPanel.dataset.activeTab = key || "";
+      bottomPanel.querySelectorAll(".bottom-tab-content").forEach(c => c.classList.toggle("active", c.dataset.tab === key));
+      setBottomPanelExpanded(true);
+    }
+  });
+  bottomPanelToggle.addEventListener("click", () => {
+    setBottomPanelExpanded(!bottomPanel.classList.contains("expanded"));
+  });
+  bottomPanel.dataset.activeTab = bottomPanel.querySelector(".bottom-tab.active")?.dataset.tab || "notebook";
+  syncBottomPanelLayoutState();
+}
+
+function setBottomPanelExpanded(expanded) {
+  if (!bottomPanel) return;
+  bottomPanel.classList.toggle("expanded", expanded);
+  syncBottomPanelLayoutState();
+}
+
+function syncBottomPanelLayoutState() {
+  appShell?.classList.toggle("bottom-panel-expanded", Boolean(bottomPanel?.classList.contains("expanded")));
+}
+
+function expandBottomPanel(tabKey) {
+  if (!bottomPanel) return;
+  if (tabKey) {
+    bottomPanel.dataset.activeTab = tabKey;
+    bottomPanel.querySelectorAll(".bottom-tab").forEach(t => t.classList.toggle("active", t.dataset.tab === tabKey));
+    bottomPanel.querySelectorAll(".bottom-tab-content").forEach(c => c.classList.toggle("active", c.dataset.tab === tabKey));
+  }
+  setBottomPanelExpanded(true);
 }
