@@ -934,21 +934,25 @@ input[type="file"] {
 .discussion-toolbar {
   grid-row: 1;
   grid-column: 1;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "phases pause"
+    "status status";
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  max-height: 96px;
+  gap: 14px 16px;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--line);
-  overflow: hidden;
-  transition: max-height 0.35s ease, opacity 0.25s ease, padding 0.35s ease, border-width 0.35s ease;
+  overflow: visible;
+  transition: opacity 0.25s ease, padding 0.35s ease, border-width 0.35s ease;
 }
 
 .phase-track {
+  grid-area: phases;
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .phase-track span {
@@ -976,12 +980,27 @@ input[type="file"] {
   color: var(--green);
 }
 
+.discussion-toolbar #pauseBtn {
+  grid-area: pause;
+  justify-self: end;
+  white-space: nowrap;
+}
+
 .agent-status-dock {
+  grid-area: status;
   display: flex;
-  flex: 1;
-  flex-wrap: wrap;
-  justify-content: flex-end;
+  flex-wrap: nowrap;
+  justify-content: center;
   gap: 8px;
+  min-width: 0;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+  white-space: nowrap;
+}
+
+.agent-status-dock::-webkit-scrollbar {
+  display: none;
 }
 
 /* Agent Avatar Dock */
@@ -989,6 +1008,7 @@ input[type="file"] {
   position: relative;
   display: inline-flex;
   align-items: center;
+  flex: 0 0 auto;
   gap: 6px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -2392,12 +2412,19 @@ input[type="file"] {
 
   .discussion-toolbar {
     align-items: stretch;
-    flex-direction: column;
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "phases"
+      "status"
+      "pause";
   }
 
   .agent-status-dock {
-    justify-content: flex-start;
     min-width: 0;
+  }
+
+  .discussion-toolbar #pauseBtn {
+    justify-self: stretch;
   }
 
   .table-card {
@@ -2493,9 +2520,9 @@ select:focus {
 }
 
 .topbar {
-  background: var(--soft-peach);
+  background: var(--peach-soft);
   border-color: transparent;
-  box-shadow: 0 16px 34px rgba(255, 222, 150, 0.24);
+  box-shadow: 0 16px 34px rgba(255, 244, 216, 0.34);
 }
 
 .logo-wrapper {
@@ -2576,11 +2603,16 @@ select:focus {
   box-shadow: 0 8px 18px rgba(201, 54, 56, 0.18);
 }
 
-.message.facilitator,
 .skill-banner,
 .note-checkpoint-panel,
 .smc-usage {
   background: rgba(246, 255, 234, 0.78);
+  border-color: rgba(98, 196, 218, 0.36);
+  color: var(--ink);
+}
+
+.message.facilitator {
+  background: var(--peach-soft);
   border-color: rgba(98, 196, 218, 0.36);
   color: var(--ink);
 }
